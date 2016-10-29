@@ -1,19 +1,13 @@
 package ru.esmukov.kpfu.lightningrodandroidvpnpoc;
 
 import android.app.PendingIntent;
-import android.app.Service;
 import android.content.Intent;
-import android.net.LocalSocket;
-import android.net.LocalSocketAddress;
 import android.net.VpnService;
 import android.os.Handler;
 import android.os.Message;
 import android.os.ParcelFileDescriptor;
 import android.util.Log;
 import android.widget.Toast;
-
-import java.io.File;
-import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.net.InetSocketAddress;
@@ -25,8 +19,8 @@ import java.nio.channels.DatagramChannel;
  * <p/>
  * Based on the ToyVpn example
  */
-public class UnixSocketVpnService extends VpnService implements Handler.Callback, Runnable {
-    private static final String TAG = "UnixSocketVpnService";
+public class SocatVpnService extends VpnService implements Handler.Callback, Runnable {
+    private static final String TAG = "SocatVpnService";
 
     private String mServerAddress;
     private String mServerPort;
@@ -53,7 +47,7 @@ public class UnixSocketVpnService extends VpnService implements Handler.Callback
         mServerPort = intent.getStringExtra(prefix + ".PORT");
         mServerConfiguration = intent.getStringExtra(prefix + ".CONFIGURATION");
         // Start a new session by creating a new thread.
-        mThread = new Thread(this, "UnixSocketVpnServiceThread");
+        mThread = new Thread(this, "SocatVpnServiceThread");
         mThread.start();
         return START_STICKY;
     }
