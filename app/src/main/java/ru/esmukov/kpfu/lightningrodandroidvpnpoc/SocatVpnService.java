@@ -20,6 +20,7 @@ import ru.esmukov.kpfu.lightningrodandroidvpnpoc.serverconnection.ServerConnecti
  * Created by kostya on 21/10/2016.
  *
  * Based on the ToyVpn example
+ * https://android.googlesource.com/platform/development/+/master/samples/ToyVpn/src/com/example/android/toyvpn/ToyVpnService.java
  */
 public class SocatVpnService extends VpnService implements Handler.Callback, Runnable {
     private static final String TAG = "SocatVpnService";
@@ -158,9 +159,11 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
                 // If we are idle or waiting for the network, sleep for a
                 // fraction of time to avoid busy looping.
                 if (idle) {
-                    // todo use socket select instead against mInterface and tunnel
+                    // todo wait on sockets somehow instead of sleeping
+                    // tunnel socket is nio, thus it's selectable
+                    // but the interface socket is not.
 
-                    Thread.sleep(100);
+                    Thread.sleep(30);
                 }
             }
         } catch (InterruptedException e) {

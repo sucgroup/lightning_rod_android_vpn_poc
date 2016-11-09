@@ -44,6 +44,7 @@ public class SocatServerConnectionInfo {
                         this.mServerAddress = fields[1];
                         this.mServerPort = Integer.parseInt(fields[2]);
                         this.mServerProtocol = SocatProtocol.fromString(fields[3]);
+                        break;
                     case 'm':
                         this.mMtu = Short.parseShort(fields[1]);
                         break;
@@ -65,7 +66,7 @@ public class SocatServerConnectionInfo {
                         break;
                 }
             } catch (Exception e) {
-                throw new IllegalArgumentException("Bad parameter: " + parameter);
+                throw new IllegalArgumentException("Bad parameter: " + parameter, e);
             }
         }
 

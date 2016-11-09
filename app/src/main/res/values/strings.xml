@@ -7,7 +7,7 @@
     <string name="configuration">Configuration:</string>
     <string name="connect">Connect!</string>
 
-    <string name="connecting">SocatTcpVpnService is connecting...</string>
-    <string name="connected">SocatTcpVpnService is connected!</string>
-    <string name="disconnected">SocatTcpVpnService is disconnected!</string>
+    <string name="connecting">SocatVpnService is connecting...</string>
+    <string name="connected">SocatVpnService is connected!</string>
+    <string name="disconnected">SocatVpnService is disconnected!</string>
 </resources>
