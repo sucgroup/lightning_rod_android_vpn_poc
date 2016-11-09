@@ -135,12 +135,8 @@ public class SocatTcpVpnService extends VpnService implements Handler.Callback, 
             FileOutputStream out = new FileOutputStream(mInterface.getFileDescriptor());
             // Allocate the buffer for a single packet.
             ByteBuffer packet = ByteBuffer.allocate(32767);
-            // We use a timer to determine the status of the tunnel. It
-            // works on both sides. A positive value means sending, and
-            // any other means receiving. We start with receiving.
-            int timer = 0;
             // We keep forwarding packets till something goes wrong.
-            while (true) {
+            while (!Thread.interrupted()) {
                 // Assume that we did not make any progress in this iteration.
                 boolean idle = true;
                 // Read the outgoing packet from the input stream.
@@ -152,10 +148,6 @@ public class SocatTcpVpnService extends VpnService implements Handler.Callback, 
                     packet.clear();
                     // There might be more outgoing packets.
                     idle = false;
-                    // If we were receiving, switch to sending.
-                    if (timer < 1) {
-                        timer = 1;
-                    }
                 }
                 // Read the incoming packet from the tunnel.
                 length = tunnel.read(packet);
@@ -165,10 +157,6 @@ public class SocatTcpVpnService extends VpnService implements Handler.Callback, 
                     packet.clear();
                     // There might be more incoming packets.
                     idle = false;
-                    // If we were sending, switch to receiving.
-                    if (timer > 0) {
-                        timer = 0;
-                    }
                 }
                 // If we are idle or waiting for the network, sleep for a
                 // fraction of time to avoid busy looping.
@@ -176,25 +164,6 @@ public class SocatTcpVpnService extends VpnService implements Handler.Callback, 
                     // todo use socket select instead against mInterface and tunnel
 
                     Thread.sleep(100);
-//                    // Increase the timer. This is inaccurate but good enough,
-//                    // since everything is operated in non-blocking mode.
-//                    timer += (timer > 0) ? 100 : -100;
-//                    // We are receiving for a long time but not sending.
-//                    if (timer < -15000) {
-//                        // Send empty control messages.
-//                        packet.put((byte) 0).limit(1);
-//                        for (int i = 0; i < 3; ++i) {
-//                            packet.position(0);
-//                            tunnel.write(packet);
-//                        }
-//                        packet.clear();
-//                        // Switch to sending.
-//                        timer = 1;
-//                    }
-//                    // We are sending for a long time but not receiving.
-//                    if (timer > 20000) {
-//                        throw new IllegalStateException("Timed out");
-//                    }
                 }
             }
         } catch (InterruptedException e) {
@@ -208,39 +177,16 @@ public class SocatTcpVpnService extends VpnService implements Handler.Callback, 
             } catch (Exception e) {
                 // ignore
             }
+            try {
+                if (mInterface != null)
+                    mInterface.close();
+            } catch (Exception e) {
+                // ignore
+            }
+            mInterface = null;
         }
         return connected;
     }
-
-/*
-    private void handshake(DatagramChannel tunnel) throws Exception {
-        // To build a secured tunnel, we should perform mutual authentication
-        // and exchange session keys for encryption. To keep things simple in
-        // this demo, we just send the shared secret in plaintext and wait
-        // for the server to send the parameters.
-        // Allocate the buffer for handshaking.
-        ByteBuffer packet = ByteBuffer.allocate(1024);
-        // Control messages always start with zero.
-        packet.put((byte) 0).put(mSharedSecret).flip();
-        // Send the secret several times in case of packet loss.
-        for (int i = 0; i < 3; ++i) {
-            packet.position(0);
-            tunnel.write(packet);
-        }
-        packet.clear();
-        // Wait for the parameters within a limited time.
-        for (int i = 0; i < 50; ++i) {
-            Thread.sleep(100);
-            // Normally we should not receive random packets.
-            int length = tunnel.read(packet);
-            if (length > 0 && packet.get(0) == 0) {
-                configure(new String(packet.array(), 1, length - 1).trim());
-                return;
-            }
-        }
-        throw new IllegalStateException("Timed out");
-    }
-*/
 
     private void configure(String parameters) throws Exception {
         // If the old interface has exactly the same parameters, use it!
@@ -249,7 +195,7 @@ public class SocatTcpVpnService extends VpnService implements Handler.Callback, 
             return;
         }
 
-        Builder builder = new VpnService.Builder();
+        Builder builder = new Builder();
         for (String parameter : parameters.split(" ")) {
             if (parameter.isEmpty())
                 continue;
