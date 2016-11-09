@@ -11,16 +11,12 @@ import android.widget.TextView;
 
 
 public class SocatVpnActivity extends ActionBarActivity implements View.OnClickListener {
-    private TextView mServerAddress;
-    private TextView mServerPort;
     private TextView mServerConfiguration;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.form);
-        mServerAddress = (TextView) findViewById(R.id.address);
-        mServerPort = (TextView) findViewById(R.id.port);
         mServerConfiguration = (TextView) findViewById(R.id.configuration);
         findViewById(R.id.connect).setOnClickListener(this);
     }
@@ -38,9 +34,7 @@ public class SocatVpnActivity extends ActionBarActivity implements View.OnClickL
     protected void onActivityResult(int request, int result, Intent data) {
         if (result == RESULT_OK) {
             String prefix = getPackageName();
-            Intent intent = new Intent(this, SocatTcpVpnService.class)
-                    .putExtra(prefix + ".ADDRESS", mServerAddress.getText().toString())
-                    .putExtra(prefix + ".PORT", mServerPort.getText().toString())
+            Intent intent = new Intent(this, SocatVpnService.class)
                     .putExtra(prefix + ".CONFIGURATION", mServerConfiguration.getText().toString());
             startService(intent);
         }

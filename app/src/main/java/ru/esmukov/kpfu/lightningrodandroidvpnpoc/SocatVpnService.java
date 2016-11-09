@@ -12,27 +12,25 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.channels.DatagramChannel;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
+
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.serverconnection.ServerConnection;
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.serverconnection.ServerConnectionFactory;
 
 /**
  * Created by kostya on 21/10/2016.
  *
  * Based on the ToyVpn example
  */
-public class SocatTcpVpnService extends VpnService implements Handler.Callback, Runnable {
-    private static final String TAG = "SocatTcpVpnService";
+public class SocatVpnService extends VpnService implements Handler.Callback, Runnable {
+    private static final String TAG = "SocatVpnService";
     private static final int CONNECT_ATTEMPTS = 3;
 
-    private String mServerAddress;
-    private String mServerPort;
-    private String mServerConfiguration;
+    private SocatServerConnectionInfo mSocatServerConnectionInfo = null;
+
     private PendingIntent mConfigureIntent;
     private Handler mHandler;
     private Thread mThread;
     private ParcelFileDescriptor mInterface;
-    private String mParameters;
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
@@ -46,11 +44,11 @@ public class SocatTcpVpnService extends VpnService implements Handler.Callback, 
         }
         // Extract information from the intent.
         String prefix = getPackageName();
-        mServerAddress = intent.getStringExtra(prefix + ".ADDRESS");
-        mServerPort = intent.getStringExtra(prefix + ".PORT");
-        mServerConfiguration = intent.getStringExtra(prefix + ".CONFIGURATION");
+        mSocatServerConnectionInfo = new SocatServerConnectionInfo(
+                intent.getStringExtra(prefix + ".CONFIGURATION")
+        );
         // Start a new session by creating a new thread.
-        mThread = new Thread(this, "SocatTcpVpnServiceThread");
+        mThread = new Thread(this, "SocatVpnServiceThread");
         mThread.start();
         return START_STICKY;
     }
@@ -74,12 +72,11 @@ public class SocatTcpVpnService extends VpnService implements Handler.Callback, 
     public synchronized void run() {
         try {
             Log.i(TAG, "Starting");
-            // If anything needs to be obtained using the network, get it now.
-            // This greatly reduces the complexity of seamless handover, which
-            // tries to recreate the tunnel without shutting down everything.
-            // In this demo, all we need to know is the server address.
+
             InetSocketAddress server = new InetSocketAddress(
-                    mServerAddress, Integer.parseInt(mServerPort));
+                    mSocatServerConnectionInfo.getServerAddress(),
+                    mSocatServerConnectionInfo.getServerPort()
+            );
             // We try to create the tunnel for several times. The better way
             // is to work with ConnectivityManager, such as trying only when
             // the network is avaiable. Here we just use a counter to keep
@@ -103,20 +100,20 @@ public class SocatTcpVpnService extends VpnService implements Handler.Callback, 
                 // ignore
             }
             mInterface = null;
-            mParameters = null;
             mHandler.sendEmptyMessage(R.string.disconnected);
             Log.i(TAG, "Exiting");
         }
     }
 
     private boolean run(InetSocketAddress server) throws Exception {
-        SocketChannel tunnel = null;
+        ServerConnection tunnel = null;
         boolean connected = false;
         try {
             // Create a SocketChannel as the VPN tunnel.
-            tunnel = SocketChannel.open();
+            tunnel = ServerConnectionFactory.fromProtocol(
+                    mSocatServerConnectionInfo.getServerProtocol());
             // Protect the tunnel before connecting to avoid loopback.
-            if (!protect(tunnel.socket())) {
+            if (!tunnel.protect(this)) {
                 throw new IllegalStateException("Cannot protect the tunnel");
             }
             // Connect to the server.
@@ -125,7 +122,7 @@ public class SocatTcpVpnService extends VpnService implements Handler.Callback, 
             // writing. Here we put the tunnel into non-blocking mode.
             tunnel.configureBlocking(false);
 
-            configure(mServerConfiguration);
+            configureVpnInterface();
             // Now we are connected. Set the flag and show the message.
             connected = true;
             mHandler.sendEmptyMessage(R.string.connected);
@@ -188,52 +185,19 @@ public class SocatTcpVpnService extends VpnService implements Handler.Callback, 
         return connected;
     }
 
-    private void configure(String parameters) throws Exception {
-        // If the old interface has exactly the same parameters, use it!
-        if (mInterface != null && parameters.equals(mParameters)) {
-            Log.i(TAG, "Using the previous interface");
-            return;
-        }
-
+    private void configureVpnInterface() {
         Builder builder = new Builder();
-        for (String parameter : parameters.split(" ")) {
-            if (parameter.isEmpty())
-                continue;
+        mSocatServerConnectionInfo.applyToVpnServiceBuilder(builder);
 
-            String[] fields = parameter.split(",");
-            try {
-                switch (fields[0].charAt(0)) {
-                    case 'm':
-                        builder.setMtu(Short.parseShort(fields[1]));
-                        break;
-                    case 'a':
-                        builder.addAddress(fields[1], Integer.parseInt(fields[2]));
-                        break;
-                    case 'r':
-                        builder.addRoute(fields[1], Integer.parseInt(fields[2]));
-                        break;
-                    case 'd':
-                        builder.addDnsServer(fields[1]);
-                        break;
-                    case 's':
-                        builder.addSearchDomain(fields[1]);
-                        break;
-                }
-            } catch (Exception e) {
-                throw new IllegalArgumentException("Bad parameter: " + parameter);
-            }
-        }
-        // Close the old interface since the parameters have been changed.
         try {
             mInterface.close();
         } catch (Exception e) {
             // ignore
         }
         // Create a new interface using the builder and save the parameters.
-        mInterface = builder.setSession(mServerAddress)
+        mInterface = builder.setSession(mSocatServerConnectionInfo.getServerAddress())
                 .setConfigureIntent(mConfigureIntent)
                 .establish();
-        mParameters = parameters;
-        Log.i(TAG, "New interface: " + parameters);
+        Log.i(TAG, "New interface");
     }
 }

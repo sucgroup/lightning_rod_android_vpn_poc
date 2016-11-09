@@ -20,7 +20,7 @@
             </intent-filter>
         </activity>
 
-        <service android:name=".SocatTcpVpnService"
+        <service android:name=".SocatVpnService"
             android:permission="android.permission.BIND_VPN_SERVICE">
             <intent-filter>
                 <action android:name="android.net.VpnService"/>
