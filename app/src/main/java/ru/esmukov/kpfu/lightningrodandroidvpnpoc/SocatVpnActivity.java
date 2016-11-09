@@ -38,7 +38,7 @@ public class SocatVpnActivity extends ActionBarActivity implements View.OnClickL
     protected void onActivityResult(int request, int result, Intent data) {
         if (result == RESULT_OK) {
             String prefix = getPackageName();
-            Intent intent = new Intent(this, SocatVpnService.class)
+            Intent intent = new Intent(this, SocatTcpVpnService.class)
                     .putExtra(prefix + ".ADDRESS", mServerAddress.getText().toString())
                     .putExtra(prefix + ".PORT", mServerPort.getText().toString())
                     .putExtra(prefix + ".CONFIGURATION", mServerConfiguration.getText().toString());

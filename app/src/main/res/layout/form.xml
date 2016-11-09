@@ -20,7 +20,7 @@
         <TextView style="@style/AppTheme" android:text="@string/port" android:layout_width="wrap_content" android:layout_height="wrap_content" />
         <EditText style="@style/AppTheme" android:id="@+id/port" android:layout_width="wrap_content" android:layout_height="wrap_content" />
         <TextView style="@style/AppTheme" android:text="@string/configuration" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-        <EditText style="@style/AppTheme" android:id="@+id/configuration" android:password="true" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        <EditText style="@style/AppTheme" android:id="@+id/configuration" android:layout_width="wrap_content" android:layout_height="wrap_content" />
         <Button style="@style/AppTheme" android:id="@+id/connect" android:text="@string/connect" android:layout_width="wrap_content" android:layout_height="wrap_content" />
 
     </LinearLayout>

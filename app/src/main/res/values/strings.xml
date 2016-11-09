@@ -1,8 +1,7 @@
 <resources>
     <string name="app_name">LightningRodAndroidVpnPoc</string>
-    <string name="title_activity_main">MainActivity</string>
+    <string name="title_activity_main">SocatVpnActivity</string>
 
-    <string name="hello_world">Hello world!</string>
     <string name="action_settings">Settings</string>
 
     <string name="address">Server Address:</string>
@@ -10,7 +9,7 @@
     <string name="configuration">Configuration:</string>
     <string name="connect">Connect!</string>
 
-    <string name="connecting">UnixSocketVpnService is connecting...</string>
-    <string name="connected">UnixSocketVpnService is connected!</string>
-    <string name="disconnected">UnixSocketVpnService is disconnected!</string>
+    <string name="connecting">SocatTcpVpnService is connecting...</string>
+    <string name="connected">SocatTcpVpnService is connected!</string>
+    <string name="disconnected">SocatTcpVpnService is disconnected!</string>
 </resources>

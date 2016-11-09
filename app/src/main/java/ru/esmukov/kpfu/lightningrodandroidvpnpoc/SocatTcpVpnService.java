@@ -13,14 +13,17 @@ import java.io.FileOutputStream;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 
 /**
  * Created by kostya on 21/10/2016.
- * <p/>
+ *
  * Based on the ToyVpn example
  */
-public class SocatVpnService extends VpnService implements Handler.Callback, Runnable {
-    private static final String TAG = "SocatVpnService";
+public class SocatTcpVpnService extends VpnService implements Handler.Callback, Runnable {
+    private static final String TAG = "SocatTcpVpnService";
+    private static final int CONNECT_ATTEMPTS = 3;
 
     private String mServerAddress;
     private String mServerPort;
@@ -47,7 +50,7 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
         mServerPort = intent.getStringExtra(prefix + ".PORT");
         mServerConfiguration = intent.getStringExtra(prefix + ".CONFIGURATION");
         // Start a new session by creating a new thread.
-        mThread = new Thread(this, "SocatVpnServiceThread");
+        mThread = new Thread(this, "SocatTcpVpnServiceThread");
         mThread.start();
         return START_STICKY;
     }
@@ -81,7 +84,7 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
             // is to work with ConnectivityManager, such as trying only when
             // the network is avaiable. Here we just use a counter to keep
             // things simple.
-            for (int attempt = 0; attempt < 10; ++attempt) {
+            for (int attempt = 0; attempt < CONNECT_ATTEMPTS; ++attempt) {
                 mHandler.sendEmptyMessage(R.string.connecting);
                 // Reset the counter if we were connected.
                 if (run(server)) {
@@ -107,11 +110,11 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
     }
 
     private boolean run(InetSocketAddress server) throws Exception {
-        DatagramChannel tunnel = null;
+        SocketChannel tunnel = null;
         boolean connected = false;
         try {
-            // Create a DatagramChannel as the VPN tunnel.
-            tunnel = DatagramChannel.open();
+            // Create a SocketChannel as the VPN tunnel.
+            tunnel = SocketChannel.open();
             // Protect the tunnel before connecting to avoid loopback.
             if (!protect(tunnel.socket())) {
                 throw new IllegalStateException("Cannot protect the tunnel");
@@ -157,11 +160,8 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
                 // Read the incoming packet from the tunnel.
                 length = tunnel.read(packet);
                 if (length > 0) {
-                    // Ignore control messages, which start with zero.
-                    if (packet.get(0) != 0) {
-                        // Write the incoming packet to the output stream.
-                        out.write(packet.array(), 0, length);
-                    }
+                    // Write the incoming packet to the output stream.
+                    out.write(packet.array(), 0, length);
                     packet.clear();
                     // There might be more incoming packets.
                     idle = false;
@@ -173,26 +173,28 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
                 // If we are idle or waiting for the network, sleep for a
                 // fraction of time to avoid busy looping.
                 if (idle) {
+                    // todo use socket select instead against mInterface and tunnel
+
                     Thread.sleep(100);
-                    // Increase the timer. This is inaccurate but good enough,
-                    // since everything is operated in non-blocking mode.
-                    timer += (timer > 0) ? 100 : -100;
-                    // We are receiving for a long time but not sending.
-                    if (timer < -15000) {
-                        // Send empty control messages.
-                        packet.put((byte) 0).limit(1);
-                        for (int i = 0; i < 3; ++i) {
-                            packet.position(0);
-                            tunnel.write(packet);
-                        }
-                        packet.clear();
-                        // Switch to sending.
-                        timer = 1;
-                    }
-                    // We are sending for a long time but not receiving.
-                    if (timer > 20000) {
-                        throw new IllegalStateException("Timed out");
-                    }
+//                    // Increase the timer. This is inaccurate but good enough,
+//                    // since everything is operated in non-blocking mode.
+//                    timer += (timer > 0) ? 100 : -100;
+//                    // We are receiving for a long time but not sending.
+//                    if (timer < -15000) {
+//                        // Send empty control messages.
+//                        packet.put((byte) 0).limit(1);
+//                        for (int i = 0; i < 3; ++i) {
+//                            packet.position(0);
+//                            tunnel.write(packet);
+//                        }
+//                        packet.clear();
+//                        // Switch to sending.
+//                        timer = 1;
+//                    }
+//                    // We are sending for a long time but not receiving.
+//                    if (timer > 20000) {
+//                        throw new IllegalStateException("Timed out");
+//                    }
                 }
             }
         } catch (InterruptedException e) {
@@ -249,6 +251,9 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
 
         Builder builder = new VpnService.Builder();
         for (String parameter : parameters.split(" ")) {
+            if (parameter.isEmpty())
+                continue;
+
             String[] fields = parameter.split(",");
             try {
                 switch (fields[0].charAt(0)) {
