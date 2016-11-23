@@ -13,7 +13,7 @@ import java.nio.ByteBuffer;
 public interface ServerConnection {
     boolean protect(VpnService vpnService);
 
-    void connect(InetSocketAddress server) throws IOException;
+    void connect() throws IOException;
 
     void configureBlocking(boolean blockingMode) throws IOException;
 

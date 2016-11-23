@@ -1,0 +1,14 @@
+#!/bin/sh
+
+# iotronic
+# ip link add gre-lr0 type gretap remote $$$ local $$$
+# ip link set gre-lr0 up
+
+# ip link add link gre-lr0 name gre-lr0.$$$ type vlan id $$$
+# ip addr add $$$/$$$ dev gre-lr0.$$$
+# ip link set gre-lr0.$$$ up
+
+# ip link del gre-lr0.$$$
+
+# todo PATH
+exec ip "$@"

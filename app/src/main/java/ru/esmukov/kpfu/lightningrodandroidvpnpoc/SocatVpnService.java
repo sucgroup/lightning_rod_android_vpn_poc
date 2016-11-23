@@ -10,7 +10,6 @@ import android.util.Log;
 import android.widget.Toast;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.serverconnection.ServerConnection;
@@ -73,11 +72,6 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
     public synchronized void run() {
         try {
             Log.i(TAG, "Starting");
-
-            InetSocketAddress server = new InetSocketAddress(
-                    mSocatServerConnectionInfo.getServerAddress(),
-                    mSocatServerConnectionInfo.getServerPort()
-            );
             // We try to create the tunnel for several times. The better way
             // is to work with ConnectivityManager, such as trying only when
             // the network is avaiable. Here we just use a counter to keep
@@ -85,7 +79,7 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
             for (int attempt = 0; attempt < CONNECT_ATTEMPTS; ++attempt) {
                 mHandler.sendEmptyMessage(R.string.connecting);
                 // Reset the counter if we were connected.
-                if (run(server)) {
+                if (createVpnTunnel()) {
                     attempt = 0;
                 }
                 // Sleep for a while. This also checks if we got interrupted.
@@ -106,19 +100,19 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
         }
     }
 
-    private boolean run(InetSocketAddress server) throws Exception {
+    private boolean createVpnTunnel() throws Exception {
         ServerConnection tunnel = null;
         boolean connected = false;
         try {
             // Create a SocketChannel as the VPN tunnel.
-            tunnel = ServerConnectionFactory.fromProtocol(
-                    mSocatServerConnectionInfo.getServerProtocol());
+            tunnel = ServerConnectionFactory.fromRemoteConnectionInfo(
+                    mSocatServerConnectionInfo.getRemoteConnectionInfo());
             // Protect the tunnel before connecting to avoid loopback.
             if (!tunnel.protect(this)) {
                 throw new IllegalStateException("Cannot protect the tunnel");
             }
             // Connect to the server.
-            tunnel.connect(server);
+            tunnel.connect();
             // For simplicity, we use the same thread for both reading and
             // writing. Here we put the tunnel into non-blocking mode.
             tunnel.configureBlocking(false);
@@ -135,6 +129,7 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
             ByteBuffer packet = ByteBuffer.allocate(32767);
             // We keep forwarding packets till something goes wrong.
             while (!Thread.interrupted()) {
+                // todo handle PI
                 // Assume that we did not make any progress in this iteration.
                 boolean idle = true;
                 // Read the outgoing packet from the input stream.
@@ -198,7 +193,7 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
             // ignore
         }
         // Create a new interface using the builder and save the parameters.
-        mInterface = builder.setSession(mSocatServerConnectionInfo.getServerAddress())
+        mInterface = builder.setSession(mSocatServerConnectionInfo.getVpnServiceName())
                 .setConfigureIntent(mConfigureIntent)
                 .establish();
         Log.i(TAG, "New interface");

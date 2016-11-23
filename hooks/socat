@@ -1,0 +1,140 @@
+#!/bin/sh
+
+# socat -d -d TCP-L:$$$,bind=localhost,reuseaddr,forever,interval=10 TUN:$$$/31,tun-name=socat0,tun-type=tap,up
+
+ORIGINAL_ARGS="$@"
+
+# tcp/udp
+ADDR1_TYPE=""
+ADDR1_PARAMS=""
+# tun
+ADDR2_TYPE=""
+ADDR2_PARAMS=""
+
+
+failexit() {
+    echo "Android socat wrapper: $@" 1>&2
+    exit 1
+}
+
+parse_option() {
+   [ "d" == "$1" ] && return 0
+   failexit "Unknown option: $1"
+}
+
+parse_arg() {
+    if [ "-" == "$1" ]; then
+        while [ ! -z "$1" ]; do
+            # pass first char
+            parse_option `printf "%c" "$1"`
+            # cut off first char
+            1=`echo "$1" | cut -c 2-`
+        done
+    fi
+
+    _TYPE=`echo "$1" | awk -F ':' '{print $1;}'`
+    _PARAMS=`echo "$1" | awk -F ':' '{print $2;}'`
+
+    if [ -z "$ADDR1_TYPE" ]; then
+        ADDR1_TYPE="$_TYPE"
+        ADDR1_PARAMS="_PARAMS"
+        return 0
+    fi
+
+    if [ -z "$ADDR2_TYPE" ]; then
+        ADDR2_TYPE="$_TYPE"
+        ADDR2_PARAMS="_PARAMS"
+        return 0
+    fi
+
+    failexit "Only 2 addresses must be specified."
+}
+
+reorder_addresses() {
+    if [ "$ADDR2_TYPE" != "TUN" ]; then
+        # swap
+        _TYPE="$ADDR2_TYPE"
+        _PARAMS="$ADDR2_PARAMS"
+        ADDR2_TYPE="$ADDR1_TYPE"
+        ADDR2_PARAMS="$ADDR1_PARAMS"
+        ADDR1_TYPE="$_TYPE"
+        ADDR1_PARAMS="$_PARAMS"
+    fi
+}
+
+get_vpnservice_configuration() {
+    get_vpnservice_configuration_tun
+    get_vpnservice_configuration_server
+    # echo "c,172.28.172.1,12312,tcp a,10.123.123.2,24 r,10.123.123.0,24"
+}
+
+get_vpnservice_configuration_tun() {
+    # ADDR2_TYPE="TUN"
+    # ADDR2_PARAMS="999.999.999.999/31,tun-name=socat0,tun-type=tap,up"
+
+    [ "TUN" != "$ADDR2_TYPE" ] && failexit "Assertion failed: other address must be a TUN"
+
+    echo "$ADDR2_PARAMS" | grep -q "tun-type=tap" || failexit "Only tun-type=tap is supported"
+
+    # append local TUN address a,10.123.123.2,24
+    printf " a,"
+    echo "$ADDR2_PARAMS" | awk -F ',' '{printf "%s", $1;}'
+
+    # todo which route to pass ???. r,10.123.123.0,24
+
+    # turn on packet info: o,pi
+    echo "$ADDR2_PARAMS" | grep -q "iff-no-pi" || printf " o,pi"
+
+    # todo apk - vpn tunnel name
+}
+
+get_vpnservice_configuration_server() {
+    # ADDR1_TYPE="TCP-L" # or TCP,UDP-CONNECT, ... ?
+    # ADDR1_PARAMS="99999,bind=localhost,reuseaddr,forever,interval=10 "
+
+    if [ "TCP" == "$ADDR1_TYPE" ]; then
+        # c,172.28.172.1,12312,tcp
+        printf " c,"
+        echo "$ADDR1_PARAMS" | awk -F ',' '{printf "%s", $1;}' | awk -F ':' '{printf "%s,%s", $1, $2;}'
+        printf ",tcp"
+    elif [ "TCP-L" == "$ADDR1_TYPE"]; then
+        printf " l,"
+        echo "$ADDR1_PARAMS" | awk -F ',' '{printf "%s", $1;}'
+        printf ",tcp"
+    else
+        failexit "Unsupported address: $ADDR1_TYPE"
+    fi
+}
+
+run_apk() {
+    am startservice -e \
+    ru.esmukov.kpfu.lightningrodandroidvpnpoc.CONFIGURATION \
+    `get_vpnservice_configuration` \
+    ru.esmukov.kpfu.lightningrodandroidvpnpoc/ru.esmukov.kpfu.lightningrodandroidvpnpoc.SocatVpnService
+
+    trap "stop_vpnservice" SIGINT SIGTERM
+    wait $$
+}
+
+stop_vpnservice() {
+    am stopservice \
+    ru.esmukov.kpfu.lightningrodandroidvpnpoc/ru.esmukov.kpfu.lightningrodandroidvpnpoc.SocatVpnService
+}
+
+
+while [ ! -z "$@" ]; do
+    parse_arg "$1"
+    shift
+done
+
+reorder_addresses
+
+if [ "TUN" == "$ADDR2_TYPE" ]; then
+    # tun is requested - use VpnService via apk
+    run_apk
+fi
+
+
+# todo PATH
+# todo check quotes
+exec socat "$ORIGINAL_ARGS"

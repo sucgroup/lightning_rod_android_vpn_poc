@@ -5,17 +5,19 @@ import android.net.VpnService;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.channels.DatagramChannel;
+import java.nio.channels.SocketChannel;
 
 /**
  * Created by kostya on 09/11/2016.
  */
 
-class UdpServerConnection implements ServerConnection {
-    private DatagramChannel mSocket;
+class TcpServerConnect implements ServerConnection {
+    private SocketChannel mSocket;
+    private InetSocketAddress mServer;
 
-    UdpServerConnection() throws IOException {
-        mSocket = DatagramChannel.open();
+    TcpServerConnect(InetSocketAddress server) throws IOException {
+        mSocket = SocketChannel.open();
+        mServer = server;
     }
 
     @Override
@@ -24,8 +26,8 @@ class UdpServerConnection implements ServerConnection {
     }
 
     @Override
-    public void connect(InetSocketAddress server) throws IOException {
-        mSocket.connect(server);
+    public void connect() throws IOException {
+        mSocket.connect(mServer);
     }
 
     @Override

@@ -2,7 +2,7 @@ package ru.esmukov.kpfu.lightningrodandroidvpnpoc.serverconnection;
 
 import java.io.IOException;
 
-import ru.esmukov.kpfu.lightningrodandroidvpnpoc.SocatProtocol;
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.SocatServerConnectionInfo;
 
 /**
  * Created by kostya on 09/11/2016.
@@ -10,12 +10,18 @@ import ru.esmukov.kpfu.lightningrodandroidvpnpoc.SocatProtocol;
 
 public class ServerConnectionFactory {
 
-    public static ServerConnection fromProtocol(SocatProtocol protocol) throws IOException {
-        switch (protocol) {
+    public static ServerConnection fromRemoteConnectionInfo(
+            SocatServerConnectionInfo.RemoteConnectionInfo remoteConnectionInfo) throws IOException {
+
+        switch (remoteConnectionInfo.getSocatProtocol()) {
             case TCP:
-                return new TcpServerConnection();
+                if (remoteConnectionInfo.isConnectSocket())
+                    return new TcpServerConnect(remoteConnectionInfo.getInetSocketAddress());
+                else
+                    return new TcpServerListen(remoteConnectionInfo.getInetSocketAddress());
             case UDP:
-                return new UdpServerConnection();
+                if (remoteConnectionInfo.isConnectSocket())
+                    return new UdpServerConnect(remoteConnectionInfo.getInetSocketAddress());
             default:
                 throw new IllegalArgumentException("Unknown protocol");
         }

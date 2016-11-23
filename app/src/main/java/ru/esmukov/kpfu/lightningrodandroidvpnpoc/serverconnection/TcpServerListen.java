@@ -5,17 +5,21 @@ import android.net.VpnService;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 
 /**
- * Created by kostya on 09/11/2016.
+ * Created by kostya on 23/11/2016.
  */
 
-class TcpServerConnection implements ServerConnection {
+public class TcpServerListen implements ServerConnection {
+    private ServerSocketChannel mServerSocket;
     private SocketChannel mSocket;
+    private InetSocketAddress mListen;
 
-    TcpServerConnection() throws IOException {
-        mSocket = SocketChannel.open();
+    TcpServerListen(InetSocketAddress listen) throws IOException {
+        mServerSocket = ServerSocketChannel.open();
+        mListen = listen;
     }
 
     @Override
@@ -24,8 +28,10 @@ class TcpServerConnection implements ServerConnection {
     }
 
     @Override
-    public void connect(InetSocketAddress server) throws IOException {
-        mSocket.connect(server);
+    public void connect() throws IOException {
+        mServerSocket.socket().bind(mListen);
+
+        mSocket = mServerSocket.accept();
     }
 
     @Override
@@ -46,5 +52,6 @@ class TcpServerConnection implements ServerConnection {
     @Override
     public void close() throws IOException {
         mSocket.close();
+        mServerSocket.close();
     }
 }
