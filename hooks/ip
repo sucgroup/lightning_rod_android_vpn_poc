@@ -10,5 +10,7 @@
 
 # ip link del gre-lr0.$$$
 
-# todo PATH
+# todo generate this dynamically ???
+export PATH="/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin:/data/data/com.termux/files/usr/bin:/data/data/com.termux/files/usr/bin/applets"
+
 exec ip "$@"

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/system/bin/sh
 
 # socat -d -d TCP-L:$$$,bind=localhost,reuseaddr,forever,interval=10 TUN:$$$/31,tun-name=socat0,tun-type=tap,up
 
@@ -23,13 +23,16 @@ parse_option() {
 }
 
 parse_arg() {
-    if [ "-" == "$1" ]; then
-        while [ ! -z "$1" ]; do
+    if [ "-" == `echo "$1" | cut -c 1` ]; then
+        # cut off the leading `-`
+        _CURRENT_ARG=`echo "$1" | cut -c 2-`
+        while [ ! -z "$_CURRENT_ARG" ]; do
             # pass first char
-            parse_option `printf "%c" "$1"`
+            parse_option `printf "%c" "$_CURRENT_ARG"`
             # cut off first char
-            1=`echo "$1" | cut -c 2-`
+            _CURRENT_ARG=`echo "$_CURRENT_ARG" | cut -c 2-`
         done
+        return
     fi
 
     _TYPE=`echo "$1" | awk -F ':' '{print $1;}'`
@@ -37,13 +40,13 @@ parse_arg() {
 
     if [ -z "$ADDR1_TYPE" ]; then
         ADDR1_TYPE="$_TYPE"
-        ADDR1_PARAMS="_PARAMS"
+        ADDR1_PARAMS="$_PARAMS"
         return 0
     fi
 
     if [ -z "$ADDR2_TYPE" ]; then
         ADDR2_TYPE="$_TYPE"
-        ADDR2_PARAMS="_PARAMS"
+        ADDR2_PARAMS="$_PARAMS"
         return 0
     fi
 
@@ -78,14 +81,18 @@ get_vpnservice_configuration_tun() {
 
     # append local TUN address a,10.123.123.2,24
     printf " a,"
-    echo "$ADDR2_PARAMS" | awk -F ',' '{printf "%s", $1;}'
+    echo "$ADDR2_PARAMS" | awk -F ',' '{printf "%s", $1;}' | awk -F '/' '{printf "%s,%s", $1, $2;}'
 
     # todo which route to pass ???. r,10.123.123.0,24
 
     # turn on packet info: o,pi
     echo "$ADDR2_PARAMS" | grep -q "iff-no-pi" || printf " o,pi"
 
-    # todo apk - vpn tunnel name
+    # interface name: n,socat0
+    printf " n,"
+    _TUN_NAME=`echo "$ADDR2_PARAMS" | grep -o "tun-name=[^,]\+" | awk -F '=' '{printf "%s", $2;}'`
+    [ -z "$_TUN_NAME" ] && _TUN_NAME="socat0"
+    printf "%s" "$_TUN_NAME"
 }
 
 get_vpnservice_configuration_server() {
@@ -97,7 +104,7 @@ get_vpnservice_configuration_server() {
         printf " c,"
         echo "$ADDR1_PARAMS" | awk -F ',' '{printf "%s", $1;}' | awk -F ':' '{printf "%s,%s", $1, $2;}'
         printf ",tcp"
-    elif [ "TCP-L" == "$ADDR1_TYPE"]; then
+    elif [ "TCP-L" == "$ADDR1_TYPE" ]; then
         printf " l,"
         echo "$ADDR1_PARAMS" | awk -F ',' '{printf "%s", $1;}'
         printf ",tcp"
@@ -107,22 +114,36 @@ get_vpnservice_configuration_server() {
 }
 
 run_apk() {
+    # todo capture exit code of a subshell
+    get_vpnservice_configuration
+
     am startservice -e \
     ru.esmukov.kpfu.lightningrodandroidvpnpoc.CONFIGURATION \
-    `get_vpnservice_configuration` \
+    "`get_vpnservice_configuration`" \
     ru.esmukov.kpfu.lightningrodandroidvpnpoc/ru.esmukov.kpfu.lightningrodandroidvpnpoc.SocatVpnService
 
     trap "stop_vpnservice" SIGINT SIGTERM
-    wait $$
+
+    # wait forever until a kill signal is received
+    while :; do
+        # todo detect service failures
+        sleep 10 &
+        wait
+    done
 }
 
 stop_vpnservice() {
     am stopservice \
     ru.esmukov.kpfu.lightningrodandroidvpnpoc/ru.esmukov.kpfu.lightningrodandroidvpnpoc.SocatVpnService
+
+    exit $?
 }
 
 
-while [ ! -z "$@" ]; do
+# todo [ "" != "$@" ] causes
+# [: -d: unexpected operator/operand
+while [ "" != "$1" ]; do
+#while [ 0 -ne `echo "$@" | wc -c` ]; do
     parse_arg "$1"
     shift
 done
@@ -132,9 +153,11 @@ reorder_addresses
 if [ "TUN" == "$ADDR2_TYPE" ]; then
     # tun is requested - use VpnService via apk
     run_apk
+    failexit "Assertion fail"
 fi
 
 
-# todo PATH
-# todo check quotes
-exec socat "$ORIGINAL_ARGS"
+# todo generate this dynamically ???
+export PATH="/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin:/data/data/com.termux/files/usr/bin:/data/data/com.termux/files/usr/bin/applets"
+
+exec socat $ORIGINAL_ARGS

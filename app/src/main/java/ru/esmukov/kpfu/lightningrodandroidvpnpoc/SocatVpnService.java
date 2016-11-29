@@ -107,12 +107,13 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
             // Create a SocketChannel as the VPN tunnel.
             tunnel = ServerConnectionFactory.fromRemoteConnectionInfo(
                     mSocatServerConnectionInfo.getRemoteConnectionInfo());
+            // Connect to the server.
+            tunnel.connect();
             // Protect the tunnel before connecting to avoid loopback.
+
             if (!tunnel.protect(this)) {
                 throw new IllegalStateException("Cannot protect the tunnel");
             }
-            // Connect to the server.
-            tunnel.connect();
             // For simplicity, we use the same thread for both reading and
             // writing. Here we put the tunnel into non-blocking mode.
             tunnel.configureBlocking(false);
