@@ -35,8 +35,8 @@ parse_arg() {
         return
     fi
 
-    _TYPE=`echo "$1" | awk -F ':' '{print $1;}'`
-    _PARAMS=`echo "$1" | awk -F ':' '{print $2;}'`
+    _TYPE=`echo "$1" | cut -d ':' -f1`
+    _PARAMS=`echo "$1" | cut -d ':' -f2-`
 
     if [ -z "$ADDR1_TYPE" ]; then
         ADDR1_TYPE="$_TYPE"
@@ -77,13 +77,15 @@ get_vpnservice_configuration_tun() {
 
     [ "TUN" != "$ADDR2_TYPE" ] && failexit "Assertion failed: other address must be a TUN"
 
-    echo "$ADDR2_PARAMS" | grep -q "tun-type=tap" || failexit "Only tun-type=tap is supported"
+    echo "$ADDR2_PARAMS" | grep -q "tun-type=tun" || failexit "Only tun-type=tun is supported"
 
     # append local TUN address a,10.123.123.2,24
     printf " a,"
     echo "$ADDR2_PARAMS" | awk -F ',' '{printf "%s", $1;}' | awk -F '/' '{printf "%s,%s", $1, $2;}'
 
-    # todo which route to pass ???. r,10.123.123.0,24
+    # Add a default route for that network.
+    printf " r,"
+    echo "$ADDR2_PARAMS" | awk -F ',' '{printf "%s", $1;}' | awk -F '/' '{printf "%s,%s", $1, $2;}'
 
     # turn on packet info: o,pi
     echo "$ADDR2_PARAMS" | grep -q "iff-no-pi" || printf " o,pi"
@@ -133,6 +135,8 @@ run_apk() {
 }
 
 stop_vpnservice() {
+    # todo running multiple vpnservices this way seems impossible
+
     am stopservice \
     ru.esmukov.kpfu.lightningrodandroidvpnpoc/ru.esmukov.kpfu.lightningrodandroidvpnpoc.SocatVpnService
 

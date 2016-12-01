@@ -66,7 +66,7 @@ public class SocatServerConnectionInfo {
                         break;
                     case 'r':
                         this.mLocalRouteAddressList.add(
-                                new AddressMask(fields[1], Integer.parseInt(fields[2]))
+                                AddressMask.networkAddressMask(fields[1], Integer.parseInt(fields[2]))
                         );
                         break;
                     case 'd':
