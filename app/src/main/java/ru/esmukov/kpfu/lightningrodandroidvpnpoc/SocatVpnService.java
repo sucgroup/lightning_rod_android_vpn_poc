@@ -180,6 +180,7 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
                 // User -> Tun
                 // Read the incoming packet from the tunnel.
                 length = tunnel.read(packet);
+                boolean skip = false;
                 if (length > 0) {
                     if (mSocatServerConnectionInfo.isPacketInfo()) {
                         if (length < 4) {
@@ -200,6 +201,12 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
                             Log.w(TAG, "PI: received non-zero flags: " + flags);
                         }
 
+                        if (proto != 0x0800) {
+                            // skin non-IP packets
+                            Log.w(TAG, "PI: received non-IP proto: " + proto);
+                            skip = true;
+                        }
+
                         // todo check PI protocol as per
                         // static ssize_t tun_get_user(struct tun_struct *tun, struct tun_file *tfile,
                         //                             void *msg_control, struct iov_iter *from,
@@ -211,8 +218,10 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
                         packet.limit(length - 4);
                         length -= 4;
                     }
-                    // Write the incoming packet to the output stream.
-                    out.write(packet.array(), 0, length);
+                    if (!skip) {
+                        // Write the incoming packet to the output stream.
+                        out.write(packet.array(), 0, length);
+                    }
                     packet.clear();
                     // There might be more incoming packets.
                     idle = false;
