@@ -33,6 +33,12 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
     private ParcelFileDescriptor mInterface;
 
     @Override
+    public void onCreate() {
+        super.onCreate();
+        prepare(getApplicationContext());
+    }
+
+    @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         // The handler is only used to show messages.
         if (mHandler == null) {
