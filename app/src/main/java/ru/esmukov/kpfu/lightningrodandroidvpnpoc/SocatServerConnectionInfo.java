@@ -6,6 +6,10 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.PacketFilter;
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.l3.L3PacketFilter;
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.l2.L2ToL3PacketFilter;
+
 /**
  * Created by kostya on 09/11/2016.
  */
@@ -32,6 +36,11 @@ public class SocatServerConnectionInfo {
 
     // o,pi
     private boolean mPacketInfo = false;
+
+    // Tap -- L2 tunnel.
+    // Tun (default) -- L3 tunnel -- the same level as a VpnService.
+    // o,tap || o,tun
+    private boolean mIsTap = false;
 
     /**
      * @param configuration Example: "c,192.168.1.1,12312,tcp a,10.123.123.2,24 r,10.123.123.0,24"
@@ -79,7 +88,15 @@ public class SocatServerConnectionInfo {
                         this.mVpnServiceName = fields[1];
                         break;
                     case 'o':
-                        this.mPacketInfo = "pi".equals(fields[1]);
+                        if ("pi".equalsIgnoreCase(fields[1]))
+                            mPacketInfo = true;
+                        if ("no_pi".equalsIgnoreCase(fields[1]))
+                            mPacketInfo = false;
+
+                        if ("tap".equalsIgnoreCase(fields[1]))
+                            mIsTap = true;
+                        if ("tun".equalsIgnoreCase(fields[1]))
+                            mIsTap = false;
                         break;
                 }
             } catch (Exception e) {
@@ -118,18 +135,23 @@ public class SocatServerConnectionInfo {
         return mVpnServiceName;
     }
 
-    public boolean isPacketInfo() {
-        return mPacketInfo;
-    }
-
     public RemoteConnectionInfo getRemoteConnectionInfo() {
         return mRemoteConnectionInfo;
     }
 
+    public PacketFilter createNewPacketFilter() {
+        if (mIsTap) {
+            return new L2ToL3PacketFilter(mPacketInfo);
+        } else {
+            return new L3PacketFilter(mPacketInfo);
+        }
+    }
 
     public interface RemoteConnectionInfo {
         SocatProtocol getSocatProtocol();
+
         boolean isConnectSocket();
+
         InetSocketAddress getInetSocketAddress();
     }
 
