@@ -1,6 +1,7 @@
 package ru.esmukov.kpfu.lightningrodandroidvpnpoc;
 
 import android.app.PendingIntent;
+import android.content.Context;
 import android.content.Intent;
 import android.net.VpnService;
 import android.os.Handler;
@@ -35,7 +36,12 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
     @Override
     public void onCreate() {
         super.onCreate();
-        prepare(getApplicationContext());
+
+        Context context = getApplicationContext();
+        if (context == null) {
+            throw new IllegalStateException("Application context is null");
+        }
+        prepare(context);
     }
 
     @Override
