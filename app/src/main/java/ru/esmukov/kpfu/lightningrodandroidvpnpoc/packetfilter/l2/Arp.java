@@ -2,35 +2,31 @@ package ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.l2;
 
 import java.nio.ByteBuffer;
 
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.ByteBufferUtils;
+
 /**
  * Created by kostya on 16/12/2016.
  */
 
 class Arp {
 
+    private static final short HARDWARE_TYPE_ETHERNET = 1;
     private static final short OPCODE_REQUEST = 0x1;
     private static final short OPCODE_REPLY = 0x2;
 
-    public static ByteBuffer request(long senderMac, int senderIp, int targetIp) {
-        ByteBuffer packet = ByteBuffer.allocate(32767);
-        packet.position(0);
-
-        packet.putShort((short)1); // hardware type -- ethernet
-        packet.putShort((short)EthernetHeader.TYPE_IP); // protocol type -- IP
-        packet.put((byte)6); // hardware size
-        packet.put((byte)4); // protocol size
-        packet.putShort(OPCODE_REQUEST); // opcode -- request
-
-        // todo:
-        // sender mac
-        // sender ip
-        // target mac
-        // target ip
-
-        return packet;
+    public static ByteBuffer createRequest(long localMac, int localIp, int targetIp) {
+        return createPacket(OPCODE_REQUEST,
+                localMac, localIp,
+                0xffffffffffffL, targetIp);
     }
 
-    public static ArpReply response(ByteBuffer packet) throws Exception {
+    public static ByteBuffer createResponse(long localMac, ArpRequest arpRequest) {
+        return createPacket(OPCODE_REPLY,
+                localMac, arpRequest.getRequestedIp(),
+                arpRequest.getRequesterMac(), arpRequest.getRequesterIp());
+    }
+
+    public static ArpPacket parsePacket(ByteBuffer packet) throws Exception {
         packet.position(0);
         short hardwareType = packet.getShort();
         short protocolType = packet.getShort();
@@ -38,7 +34,7 @@ class Arp {
         byte protocolSize = packet.get();
         short opcode = packet.getShort();
 
-        if (hardwareType != 1)
+        if (hardwareType != HARDWARE_TYPE_ETHERNET)
             throw new Exception("Bad hardware type: " + hardwareType);
 
         if (protocolType != EthernetHeader.TYPE_IP)
@@ -50,31 +46,47 @@ class Arp {
         if (protocolSize != 4)
             throw new Exception("Bad protocol size: " + protocolSize);
 
-        if (opcode != OPCODE_REPLY)
-            throw new Exception("Bad opcode: " + opcode);
+        long senderMac = ByteBufferUtils.get6bytes(packet);
+        int senderIp = packet.getInt();
+        long targetMac = ByteBufferUtils.get6bytes(packet);
+        int targetIp = packet.getInt();
 
-        // todo:
-        long senderMac;
-        int senderIp;
-        long targetMac;
-        int targetIp;
-
-        return new ArpReply(senderMac, senderIp, targetMac, targetIp);
+        return ArpPacket.create(opcode, senderMac, senderIp, targetMac, targetIp);
     }
 
 
-    public static class ArpReply {
+    static class ArpPacket {
+        protected long mSenderMac;
+        protected int mSenderIp;
+        protected long mTargetMac;
+        protected int mTargetIp;
 
-        private long mSenderMac;
-        private int mSenderIp;
-        private long mTargetMac;
-        private int mTargetIp;
-
-        private ArpReply(long senderMac, int senderIp, long targetMac, int targetIp) {
+        private ArpPacket(long senderMac, int senderIp,
+                          long targetMac, int targetIp) throws Exception {
             mSenderMac = senderMac;
             mSenderIp = senderIp;
             mTargetMac = targetMac;
             mTargetIp = targetIp;
+        }
+
+        private static ArpPacket create(short opcode, long senderMac, int senderIp,
+                                        long targetMac, int targetIp) throws Exception {
+
+            if (opcode == OPCODE_REPLY)
+                return new ArpReply(senderMac, senderIp, targetMac, targetIp);
+
+            if (opcode == OPCODE_REQUEST)
+                return new ArpRequest(senderMac, senderIp, targetMac, targetIp);
+
+            throw new Exception("Bad opcode: " + opcode);
+
+        }
+    }
+
+    static class ArpReply extends ArpPacket {
+
+        ArpReply(long senderMac, int senderIp, long targetMac, int targetIp) throws Exception {
+            super(senderMac, senderIp, targetMac, targetIp);
         }
 
         public long getReplyerMac() {
@@ -84,6 +96,44 @@ class Arp {
         public int getReplyerIp() {
             return mSenderIp;
         }
+    }
+
+    static class ArpRequest extends ArpPacket {
+        public ArpRequest(long senderMac, int senderIp, long targetMac, int targetIp) throws Exception {
+            super(senderMac, senderIp, targetMac, targetIp);
+        }
+
+        public long getRequesterMac() {
+            return mSenderMac;
+        }
+
+        public int getRequesterIp() {
+            return mSenderIp;
+        }
+
+        public int getRequestedIp() {
+            return mTargetIp;
+        }
+    }
+
+    private static ByteBuffer createPacket(short opcode,
+                                           long senderMac, int senderIp,
+                                           long targetMac, int targetIp) {
+        ByteBuffer packet = ByteBuffer.allocate(256);
+        packet.position(0);
+
+        packet.putShort(HARDWARE_TYPE_ETHERNET); // hardware type -- ethernet
+        packet.putShort((short) EthernetHeader.TYPE_IP); // protocol type -- IP
+        packet.put((byte) 6); // hardware size
+        packet.put((byte) 4); // protocol size
+        packet.putShort(opcode); // opcode -- createRequest
+
+        ByteBufferUtils.put6bytes(packet, senderMac);
+        packet.putInt(senderIp);
+        ByteBufferUtils.put6bytes(packet, targetMac);
+        packet.putInt(targetIp);
+
+        return packet;
     }
 
 }

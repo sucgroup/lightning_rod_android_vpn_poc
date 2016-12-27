@@ -35,7 +35,7 @@ class MacResolver {
         int destinationIp = getDestinationIpFromL3Packet(packet);
 
         mPacketDeque.add(CustomPacket.fromL2Packet(
-                Arp.request(getLocalMacAddress(), getSourceIpFromL3Packet(packet), destinationIp)));
+                Arp.createRequest(getLocalMacAddress(), getSourceIpFromL3Packet(packet), destinationIp)));
 
         if (!mIpToPacketsWaitingForMacResolution.containsKey(destinationIp)) {
             mIpToPacketsWaitingForMacResolution.put(destinationIp, new LinkedList<CustomPacket>());
@@ -50,14 +50,24 @@ class MacResolver {
     }
 
     public void processIncomingArpPacket(ByteBuffer packet) throws Exception {
-        // todo maybe reject arp packets not targeted to us?
-        Arp.ArpReply arpReply = Arp.response(packet);
+        Arp.ArpPacket arpPacket = Arp.parsePacket(packet);
 
-        mIpToMac.put(arpReply.getReplyerIp(), arpReply.getReplyerMac());
+        if (arpPacket instanceof Arp.ArpRequest) {
+            mPacketDeque.add(CustomPacket.fromL2Packet(
+                    Arp.createResponse(getLocalMacAddress(), (Arp.ArpRequest)arpPacket)
+            ));
+        }
 
-        if (mIpToPacketsWaitingForMacResolution.containsKey(arpReply.getReplyerIp())) {
-            mPacketDeque.addAll(mIpToPacketsWaitingForMacResolution.get(arpReply.getReplyerIp()));
-            mIpToPacketsWaitingForMacResolution.remove(arpReply.getReplyerIp());
+        if (arpPacket instanceof Arp.ArpReply) {
+            // todo ?? maybe reject arp packets not targeted to us?
+            Arp.ArpReply arpReply = (Arp.ArpReply)arpPacket;
+
+            mIpToMac.put(arpReply.getReplyerIp(), arpReply.getReplyerMac());
+
+            if (mIpToPacketsWaitingForMacResolution.containsKey(arpReply.getReplyerIp())) {
+                mPacketDeque.addAll(mIpToPacketsWaitingForMacResolution.get(arpReply.getReplyerIp()));
+                mIpToPacketsWaitingForMacResolution.remove(arpReply.getReplyerIp());
+            }
         }
     }
 
@@ -69,7 +79,7 @@ class MacResolver {
         return packet.getInt(12);
     }
 
-    public static class CustomPacket {
+    static class CustomPacket {
         private ByteBuffer mPacket;
         private boolean mIsL3;
 

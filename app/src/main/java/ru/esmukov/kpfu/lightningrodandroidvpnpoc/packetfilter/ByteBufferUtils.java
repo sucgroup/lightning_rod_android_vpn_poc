@@ -30,4 +30,21 @@ public class ByteBufferUtils {
         to.limit(from.limit());
         to.put(from.array(), 0, from.limit());
     }
+
+    public static void put6bytes(ByteBuffer byteBuffer, long l) {
+        // first byte
+        byteBuffer.put((byte)(l >> (8 * 5)));
+        // second byte
+        byteBuffer.put((byte)(l >> (8 * 4)));
+        // rest 4 bytes
+        byteBuffer.putInt((int)(l));
+    }
+
+    public static long get6bytes(ByteBuffer byteBuffer) {
+        long l = 0;
+        l |= (long)byteBuffer.get() << (8 * 5);
+        l |= (long)byteBuffer.get() << (8 * 4);
+        l |= (long)byteBuffer.getInt();
+        return l;
+    }
 }

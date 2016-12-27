@@ -38,7 +38,7 @@ public class SocatServerConnectionInfo {
     private boolean mPacketInfo = false;
 
     // Tap -- L2 tunnel.
-    // Tun (default) -- L3 tunnel -- the same level as a VpnService.
+    // Tun (default) -- L3 tunnel -- the same level as the VpnService.
     // o,tap || o,tun
     private boolean mIsTap = false;
 
