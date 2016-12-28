@@ -155,6 +155,7 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
 
                 // Tun -> User
                 // Read the outgoing packet from the input stream.
+                packet.clear();
                 int length = in.read(packet.array());
 
                 if (length > 0) {
@@ -176,6 +177,7 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
 
                 // User -> Tun
                 // Read the incoming packet from the tunnel.
+                packet.clear();
                 length = tunnel.read(packet);
                 if (length > 0) {
                     packet.limit(length);

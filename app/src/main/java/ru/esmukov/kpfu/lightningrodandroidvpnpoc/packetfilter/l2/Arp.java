@@ -133,6 +133,11 @@ class Arp {
         ByteBufferUtils.put6bytes(packet, targetMac);
         packet.putInt(targetIp);
 
+        packet.limit(packet.position());
+
+        // todo move this
+        new EthernetHeader(senderMac, targetMac, EthernetHeader.TYPE_ARP).addToPacket(packet);
+
         return packet;
     }
 

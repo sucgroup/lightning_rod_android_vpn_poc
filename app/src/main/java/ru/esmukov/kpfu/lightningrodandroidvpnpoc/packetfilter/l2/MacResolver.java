@@ -53,21 +53,28 @@ class MacResolver {
         Arp.ArpPacket arpPacket = Arp.parsePacket(packet);
 
         if (arpPacket instanceof Arp.ArpRequest) {
+            Arp.ArpRequest arpRequest = (Arp.ArpRequest)arpPacket;
+
             mPacketDeque.add(CustomPacket.fromL2Packet(
-                    Arp.createResponse(getLocalMacAddress(), (Arp.ArpRequest)arpPacket)
+                    Arp.createResponse(getLocalMacAddress(), arpRequest)
             ));
+
+            addIpToMacPair(arpRequest.getRequesterIp(), arpRequest.getRequesterMac());
         }
 
         if (arpPacket instanceof Arp.ArpReply) {
-            // todo ?? maybe reject arp packets not targeted to us?
             Arp.ArpReply arpReply = (Arp.ArpReply)arpPacket;
 
-            mIpToMac.put(arpReply.getReplyerIp(), arpReply.getReplyerMac());
+            addIpToMacPair(arpReply.getReplyerIp(), arpReply.getReplyerMac());
+        }
+    }
 
-            if (mIpToPacketsWaitingForMacResolution.containsKey(arpReply.getReplyerIp())) {
-                mPacketDeque.addAll(mIpToPacketsWaitingForMacResolution.get(arpReply.getReplyerIp()));
-                mIpToPacketsWaitingForMacResolution.remove(arpReply.getReplyerIp());
-            }
+    private void addIpToMacPair(int ip, long mac) {
+        mIpToMac.put(ip, mac);
+
+        if (mIpToPacketsWaitingForMacResolution.containsKey(ip)) {
+            mPacketDeque.addAll(mIpToPacketsWaitingForMacResolution.get(ip));
+            mIpToPacketsWaitingForMacResolution.remove(ip);
         }
     }
 

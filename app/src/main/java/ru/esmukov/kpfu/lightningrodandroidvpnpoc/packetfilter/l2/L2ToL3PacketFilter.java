@@ -35,21 +35,30 @@ public class L2ToL3PacketFilter implements PacketFilter {
         EthernetHeader ethernetHeader = new EthernetHeader(destinationMac,
                 mMacResolver.getLocalMacAddress(), EthernetHeader.TYPE_IP);
         ethernetHeader.addToPacket(packet);
+
+        packet.position(0);
         return true;
     }
 
     @Override
     public boolean fromRemoteToLocal(ByteBuffer packet) {
-        EthernetHeader ethernetHeader = EthernetHeader.stripFromPacket(packet);
+        EthernetHeader ethernetHeader;
+        try {
+            ethernetHeader = EthernetHeader.stripFromPacket(packet);
+        }
+        catch (Exception e) {
+            Log.i(TAG, "ETHERNET bad incoming packet", e);
+            return false;
+        }
 
-        if (ethernetHeader.getmEtherType() == EthernetHeader.TYPE_IP)
+        if (ethernetHeader.getEtherType() == EthernetHeader.TYPE_IP)
             return true;
 
-        if (ethernetHeader.getmEtherType() == EthernetHeader.TYPE_IPV6)
+        if (ethernetHeader.getEtherType() == EthernetHeader.TYPE_IPV6)
             // silently drop any IPV6 communications
             return false;
 
-        if (ethernetHeader.getmEtherType() == EthernetHeader.TYPE_ARP) {
+        if (ethernetHeader.getEtherType() == EthernetHeader.TYPE_ARP) {
             try {
                 mMacResolver.processIncomingArpPacket(packet);
             }
@@ -59,7 +68,7 @@ public class L2ToL3PacketFilter implements PacketFilter {
             return false;
         }
 
-        Log.i(TAG, "dropped packet with unknown etherType: " + ethernetHeader.getmEtherType());
+        Log.i(TAG, "dropped packet with unknown etherType: " + ethernetHeader.getEtherType());
         return false;
     }
 
@@ -75,6 +84,8 @@ public class L2ToL3PacketFilter implements PacketFilter {
         if (customPacket.isL3()) {
             return this.fromLocalToRemote(buffer);
         }
+
+        buffer.position(0);
 
         return true;
     }

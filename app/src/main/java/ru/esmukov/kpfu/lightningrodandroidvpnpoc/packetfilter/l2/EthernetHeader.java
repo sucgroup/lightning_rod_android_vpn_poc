@@ -14,10 +14,13 @@ class EthernetHeader {
     public static final int TYPE_IP = 0x0800;
     public static final int TYPE_IPV6 = 0x86DD;
 
+    private static final int ETHERNET_HEADER_LENGTH = 6 + 6 + 2;
+
     private long mDestinationMac; // 6 bytes
     private long mSourceMac; // 6 bytes
     // todo 802.1Q tag
     private int mEtherType; // 2 bytes
+
 
     public EthernetHeader(long destinationMac, long sourceMac, int etherType) {
         mDestinationMac = destinationMac;
@@ -28,39 +31,39 @@ class EthernetHeader {
     public static EthernetHeader stripFromPacket(ByteBuffer packet) {
         long destinationMac = packet.getLong(0);
         // strip 2 extra bytes (8 bytes of long - 6 bytes of mac)
-        destinationMac = destinationMac >> (2 * 8);
+        destinationMac = destinationMac >>> (2 * 8);
 
         long sourceMac = packet.getLong(6);
-        sourceMac = sourceMac >> (2 * 8);
+        sourceMac = sourceMac >>> (2 * 8);
 
         int etherType = ((packet.get(6 + 6) & 0xFF) << 8) | (packet.get(6 + 6 + 1) & 0xFF);
 
-        ByteBufferUtils.moveLeft(packet, 6 + 6 + 2);
+        ByteBufferUtils.moveLeft(packet, ETHERNET_HEADER_LENGTH);
 
         return new EthernetHeader(destinationMac, sourceMac, etherType);
     }
 
     public void addToPacket(ByteBuffer packet) {
-        ByteBufferUtils.moveRight(packet, 6 + 6 + 2);
+        ByteBufferUtils.moveRight(packet, ETHERNET_HEADER_LENGTH);
 
-        packet.putShort(0, (short)(mSourceMac >> (4 * 8)));
-        packet.putInt(2, (int)(mSourceMac));
+        packet.putShort(0, (short)((mSourceMac >>> (4 * 8)) & 0xFFFF));
+        packet.putInt(2, (int)(mSourceMac & 0xFFFFFFFFL));
 
-        packet.putShort(6, (short)(mDestinationMac >> (4 * 8)));
-        packet.putInt(8, (int)(mDestinationMac));
+        packet.putShort(6, (short)((mDestinationMac >>> (4 * 8)) & 0xFFFF));
+        packet.putInt(8, (int)(mDestinationMac & 0xFFFFFFFFL));
 
-        packet.putShort(6 + 6, (short) mEtherType);
+        packet.putShort(6 + 6, (short)(mEtherType & 0xFFFF));
     }
 
     public long getDestinationMac() {
         return mDestinationMac;
     }
 
-    public long getmSourceMac() {
+    public long getSourceMac() {
         return mSourceMac;
     }
 
-    public int getmEtherType() {
+    public int getEtherType() {
         return mEtherType;
     }
 }
