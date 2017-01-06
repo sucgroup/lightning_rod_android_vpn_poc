@@ -8,7 +8,7 @@ import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.ByteBufferUtils;
  * Created by kostya on 16/12/2016.
  */
 
-class EthernetHeader {
+public class EthernetHeader {
     // http://www.iana.org/assignments/ieee-802-numbers/ieee-802-numbers.xhtml#ieee-802-numbers-1
     public static final int TYPE_ARP = 0x0806;
     public static final int TYPE_IP = 0x0800;
@@ -38,11 +38,15 @@ class EthernetHeader {
         long sourceMac = frame.getLong(6);
         sourceMac = sourceMac >>> (2 * 8);
 
-        int etherType = ((frame.get(6 + 6) & 0xFF) << 8) | (frame.get(6 + 6 + 1) & 0xFF);
+        int etherType = getEtherType(frame);
 
         ByteBufferUtils.moveLeft(frame, ETHERNET_HEADER_LENGTH);
 
         return new EthernetHeader(destinationMac, sourceMac, etherType);
+    }
+
+    public static int getEtherType(ByteBuffer frame) {
+        return ((frame.get(6 + 6) & 0xFF) << 8) | (frame.get(6 + 6 + 1) & 0xFF);
     }
 
     public void addToPacket(ByteBuffer packet) {

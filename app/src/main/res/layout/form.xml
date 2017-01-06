@@ -22,7 +22,7 @@
             style="@style/AppTheme"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="o,tap c,172.28.172.1,12313,tcp a,10.123.123.2,30 n,socat0 r,10.123.123.2,30"
+            android:text="o,tap o,pi c,172.28.172.1,12313,tcp a,10.123.123.2,30 n,socat0 r,10.123.123.2,30"
             />
         <!--android:text="o,pi c,172.28.172.1,12313,tcp a,10.123.123.2,30 n,socat0 r,10.123.123.2,30"-->
         <!--android:text="a,10.123.123.2,30 o,pi n,socat0 l,12312,tcp"-->

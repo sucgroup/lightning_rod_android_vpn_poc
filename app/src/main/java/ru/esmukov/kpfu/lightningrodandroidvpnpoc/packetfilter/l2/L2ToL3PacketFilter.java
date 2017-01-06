@@ -6,6 +6,7 @@ import java.nio.ByteBuffer;
 
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.ByteBufferUtils;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.PacketFilter;
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.PacketInfo;
 
 /**
  * Created by kostya on 16/12/2016.
@@ -17,9 +18,10 @@ public class L2ToL3PacketFilter implements PacketFilter {
     private MacResolver mMacResolver = new MacResolver(
             LocalMacAddressGenerator.generateRandomLocallyAdministeredMacAddress());
 
+    private boolean mPacketInfo;
+
     public L2ToL3PacketFilter(boolean packetInfo) {
-        // todo !!! packet info
-        // 0x0000 + ethertype
+        mPacketInfo = packetInfo;
     }
 
     /**
@@ -42,6 +44,9 @@ public class L2ToL3PacketFilter implements PacketFilter {
                 mMacResolver.getLocalMacAddress(), EthernetHeader.TYPE_IP);
         ethernetHeader.addToPacket(ip4Packet);
 
+        if (mPacketInfo) {
+            PacketInfo.prepend(ip4Packet, ethernetHeader.getEtherType());
+        }
         return true;
     }
 
@@ -53,11 +58,26 @@ public class L2ToL3PacketFilter implements PacketFilter {
      */
     @Override
     public boolean fromRemoteToLocal(ByteBuffer remotePacket) {
+        int packetInfoProto = -1;
+        if (mPacketInfo) {
+            try {
+                packetInfoProto = PacketInfo.strip(remotePacket).getProto();
+            } catch (Exception e) {
+                Log.i(TAG, "Packet info exception", e);
+                return false;
+            }
+        }
+
         EthernetHeader ethernetHeader;
         try {
             ethernetHeader = EthernetHeader.stripFromFrame(remotePacket);
         } catch (Exception e) {
             Log.i(TAG, "ETHERNET bad incoming packet", e);
+            return false;
+        }
+
+        if (mPacketInfo && packetInfoProto != ethernetHeader.getEtherType()) {
+            Log.w(TAG, "PI type != etherType. Packet is probably corrupted. Dropped it.");
             return false;
         }
 
@@ -101,6 +121,9 @@ public class L2ToL3PacketFilter implements PacketFilter {
             return this.fromLocalToRemote(remotePacket);
         }
 
+        if (mPacketInfo) {
+            PacketInfo.prepend(remotePacket, EthernetHeader.getEtherType(remotePacket));
+        }
         return true;
     }
 }
