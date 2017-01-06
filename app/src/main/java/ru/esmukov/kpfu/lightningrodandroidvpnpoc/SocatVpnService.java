@@ -13,6 +13,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.nio.ByteBuffer;
 
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.PacketFilter;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.serverconnection.ServerConnection;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.serverconnection.ServerConnectionFactory;
 
@@ -140,6 +141,9 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
             FileOutputStream out = new FileOutputStream(mInterface.getFileDescriptor());
             // Allocate the buffer for a single packet.
             ByteBuffer packet = ByteBuffer.allocate(32767);
+
+            PacketFilter packetFilter = mSocatServerConnectionInfo.createNewPacketFilter();
+
             // We keep forwarding packets till something goes wrong.
             while (!Thread.interrupted()) {
                 // Packet info usage (search for `struct tun_pi`):
@@ -151,84 +155,38 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
 
                 // Tun -> User
                 // Read the outgoing packet from the input stream.
+                packet.clear();
                 int length = in.read(packet.array());
+
                 if (length > 0) {
-                    if (mSocatServerConnectionInfo.isPacketInfo()) {
-
-                        // todo looks like we don't need to ever set the TUN_PKT_STRIP flag, right?
-                        // see:
-                        // static ssize_t tun_put_user(struct tun_struct *tun,
-                        //                             struct tun_file *tfile,
-                        //                             struct sk_buff *skb,
-                        //                             struct iov_iter *iter)
-
-                        // http://lxr.free-electrons.com/source/include/uapi/linux/if_ether.h
-                        short flags = 0;
-                        short proto = 0x0800;  // ETH_P_IP. 0800 - ip4, 86DD - ip6
-
-                        packet.limit(length + 4);
-                        for (int i = length - 1; i >= 0; i--) {
-                            packet.put(i + 4, packet.get(i));
-                        }
-                        packet.putShort(0, flags);
-                        packet.putShort(2, proto);
-
-                        length += 4;
-                    }
-                    // Write the outgoing packet to the tunnel.
                     packet.limit(length);
-                    tunnel.write(packet);
-                    packet.clear();
+
+                    if (packetFilter.fromLocalToRemote(packet)) {
+                        tunnel.write(packet);
+                    }
+
+                    // packet.clear();
                     // There might be more outgoing packets.
+                    idle = false;
+                }
+
+                while (packetFilter.nextCustomPacketToRemote(packet)) {
+                    tunnel.write(packet);
                     idle = false;
                 }
 
                 // User -> Tun
                 // Read the incoming packet from the tunnel.
+                packet.clear();
                 length = tunnel.read(packet);
-                boolean skip = false;
                 if (length > 0) {
-                    if (mSocatServerConnectionInfo.isPacketInfo()) {
-                        if (length < 4) {
-                            Log.i(TAG, "PI: dropped packet with invalid length (<4)");
-                        }
+                    packet.limit(length);
 
-                        /*
-                        struct tun_pi {
-                            __u16  flags;
-                            __be16 proto;
-                        };
-                         */
-                        // todo check byte order
-                        int flags = ((packet.get(0) & 0xFF) << 8) | (packet.get(1) & 0xFF);
-                        int proto = ((packet.get(2) & 0xFF) << 8) | (packet.get(3) & 0xFF);
-
-                        if (flags != 0) {
-                            Log.w(TAG, "PI: received non-zero flags: " + flags);
-                        }
-
-                        if (proto != 0x0800) {
-                            // skin non-IP packets
-                            Log.w(TAG, "PI: received non-IP proto: " + proto);
-                            skip = true;
-                        }
-
-                        // todo check PI protocol as per
-                        // static ssize_t tun_get_user(struct tun_struct *tun, struct tun_file *tfile,
-                        //                             void *msg_control, struct iov_iter *from,
-                        //                             int noblock)
-
-                        for (int i = 0; i < length; i++) {
-                            packet.put(i, packet.get(i + 4));
-                        }
-                        packet.limit(length - 4);
-                        length -= 4;
+                    if (packetFilter.fromRemoteToLocal(packet)) {
+                        out.write(packet.array(), 0, packet.limit());
                     }
-                    if (!skip) {
-                        // Write the incoming packet to the output stream.
-                        out.write(packet.array(), 0, length);
-                    }
-                    packet.clear();
+
+                    // packet.clear();
                     // There might be more incoming packets.
                     idle = false;
                 }
