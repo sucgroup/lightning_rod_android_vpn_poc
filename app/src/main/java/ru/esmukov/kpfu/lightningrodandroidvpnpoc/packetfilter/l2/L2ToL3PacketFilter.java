@@ -22,37 +22,47 @@ public class L2ToL3PacketFilter implements PacketFilter {
         // 0x0000 + ethertype
     }
 
+    /**
+     * Prepend L2 headers to an outgoing L3 IP4 packet
+     *
+     * @param ip4Packet Local IP4 packet
+     * @return Should the packet be sent? Drop it otherwise.
+     */
     @Override
-    public boolean fromLocalToRemote(ByteBuffer packet) {
-        Long destinationMac = mMacResolver.getDestinationMacAddressByL3Packet(packet);
+    public boolean fromLocalToRemote(ByteBuffer ip4Packet) {
+        Long destinationMac = mMacResolver.getDestinationMacAddressByL3IpPacket(ip4Packet);
 
         if (destinationMac == null) {
-            mMacResolver.resolveMacAndQueueL3Packet(packet);
-            // unknown mac as for now.
+            mMacResolver.resolveMacAndQueueL3IpPacket(ip4Packet);
+            // unknown destination mac as for now.
             return false;
         }
 
         EthernetHeader ethernetHeader = new EthernetHeader(destinationMac,
                 mMacResolver.getLocalMacAddress(), EthernetHeader.TYPE_IP);
-        ethernetHeader.addToPacket(packet);
+        ethernetHeader.addToPacket(ip4Packet);
 
-        packet.position(0);
         return true;
     }
 
+    /**
+     * Strip L2 headers and accept L3 IP4 packets only
+     *
+     * @param remotePacket Raw L2 packet
+     * @return Should the packet be accepted? Drop it otherwise.
+     */
     @Override
-    public boolean fromRemoteToLocal(ByteBuffer packet) {
+    public boolean fromRemoteToLocal(ByteBuffer remotePacket) {
         EthernetHeader ethernetHeader;
         try {
-            ethernetHeader = EthernetHeader.stripFromPacket(packet);
-        }
-        catch (Exception e) {
+            ethernetHeader = EthernetHeader.stripFromFrame(remotePacket);
+        } catch (Exception e) {
             Log.i(TAG, "ETHERNET bad incoming packet", e);
             return false;
         }
 
         if (ethernetHeader.getEtherType() == EthernetHeader.TYPE_IP)
-            return true;
+            return mMacResolver.shouldFrameBeAccepted(ethernetHeader.getDestinationMac());
 
         if (ethernetHeader.getEtherType() == EthernetHeader.TYPE_IPV6)
             // silently drop any IPV6 communications
@@ -60,9 +70,8 @@ public class L2ToL3PacketFilter implements PacketFilter {
 
         if (ethernetHeader.getEtherType() == EthernetHeader.TYPE_ARP) {
             try {
-                mMacResolver.processIncomingArpPacket(packet);
-            }
-            catch (Exception e) {
+                mMacResolver.processIncomingArpPacket(remotePacket);
+            } catch (Exception e) {
                 Log.i(TAG, "ARP bad incoming packet", e);
             }
             return false;
@@ -72,20 +81,25 @@ public class L2ToL3PacketFilter implements PacketFilter {
         return false;
     }
 
+    /**
+     * Send pending packet (i.e. outgoing ARP request,
+     * IP4 packet with recently resolved destination MAC)
+     *
+     * @param remotePacket Any buffer
+     * @return Is a packet to be sent put to the `remotePacket` buffer
+     */
     @Override
-    public boolean nextCustomPacketToRemote(ByteBuffer buffer) {
+    public boolean nextCustomPacketToRemote(ByteBuffer remotePacket) {
         MacResolver.CustomPacket customPacket = mMacResolver.pollPacketFromQueue();
 
         if (customPacket == null)
             return false;
 
-        ByteBufferUtils.putFromOneIntoAnother(customPacket.getPacket(), buffer);
+        ByteBufferUtils.copy(customPacket.getPacket(), remotePacket);
 
         if (customPacket.isL3()) {
-            return this.fromLocalToRemote(buffer);
+            return this.fromLocalToRemote(remotePacket);
         }
-
-        buffer.position(0);
 
         return true;
     }

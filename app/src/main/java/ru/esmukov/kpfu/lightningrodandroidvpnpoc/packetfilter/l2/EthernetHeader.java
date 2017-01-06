@@ -14,6 +14,8 @@ class EthernetHeader {
     public static final int TYPE_IP = 0x0800;
     public static final int TYPE_IPV6 = 0x86DD;
 
+    public static final long BROADCAST_MAC = 0xff_ff_ff_ff_ff_ffL;
+
     private static final int ETHERNET_HEADER_LENGTH = 6 + 6 + 2;
 
     private long mDestinationMac; // 6 bytes
@@ -28,17 +30,17 @@ class EthernetHeader {
         mEtherType = etherType;
     }
 
-    public static EthernetHeader stripFromPacket(ByteBuffer packet) {
-        long destinationMac = packet.getLong(0);
+    public static EthernetHeader stripFromFrame(ByteBuffer frame) {
+        long destinationMac = frame.getLong(0);
         // strip 2 extra bytes (8 bytes of long - 6 bytes of mac)
         destinationMac = destinationMac >>> (2 * 8);
 
-        long sourceMac = packet.getLong(6);
+        long sourceMac = frame.getLong(6);
         sourceMac = sourceMac >>> (2 * 8);
 
-        int etherType = ((packet.get(6 + 6) & 0xFF) << 8) | (packet.get(6 + 6 + 1) & 0xFF);
+        int etherType = ((frame.get(6 + 6) & 0xFF) << 8) | (frame.get(6 + 6 + 1) & 0xFF);
 
-        ByteBufferUtils.moveLeft(packet, ETHERNET_HEADER_LENGTH);
+        ByteBufferUtils.moveLeft(frame, ETHERNET_HEADER_LENGTH);
 
         return new EthernetHeader(destinationMac, sourceMac, etherType);
     }
@@ -46,13 +48,13 @@ class EthernetHeader {
     public void addToPacket(ByteBuffer packet) {
         ByteBufferUtils.moveRight(packet, ETHERNET_HEADER_LENGTH);
 
-        packet.putShort(0, (short)((mSourceMac >>> (4 * 8)) & 0xFFFF));
-        packet.putInt(2, (int)(mSourceMac & 0xFFFFFFFFL));
+        packet.putShort(0, (short) ((mSourceMac >>> (4 * 8)) & 0xFFFF));
+        packet.putInt(2, (int) (mSourceMac & 0xFFFFFFFFL));
 
-        packet.putShort(6, (short)((mDestinationMac >>> (4 * 8)) & 0xFFFF));
-        packet.putInt(8, (int)(mDestinationMac & 0xFFFFFFFFL));
+        packet.putShort(6, (short) ((mDestinationMac >>> (4 * 8)) & 0xFFFF));
+        packet.putInt(8, (int) (mDestinationMac & 0xFFFFFFFFL));
 
-        packet.putShort(6 + 6, (short)(mEtherType & 0xFFFF));
+        packet.putShort(6 + 6, (short) (mEtherType & 0xFFFF));
     }
 
     public long getDestinationMac() {

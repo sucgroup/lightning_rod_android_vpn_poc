@@ -16,23 +16,23 @@ public class L3PacketFilter implements PacketFilter {
     }
 
     @Override
-    public boolean fromLocalToRemote(ByteBuffer packet) {
+    public boolean fromLocalToRemote(ByteBuffer ip4Packet) {
         if (mPacketInfo) {
-            return L3PacketInfo.fromLocalToRemote(packet);
+            return L3PacketInfo.fromLocalToRemote(ip4Packet);
         }
         return true;
     }
 
     @Override
-    public boolean fromRemoteToLocal(ByteBuffer packet) {
+    public boolean fromRemoteToLocal(ByteBuffer remotePacket) {
         if (mPacketInfo) {
-            return L3PacketInfo.fromRemoteToLocal(packet);
+            return L3PacketInfo.fromRemoteToLocal(remotePacket);
         }
         return true;
     }
 
     @Override
-    public boolean nextCustomPacketToRemote(ByteBuffer buffer) {
+    public boolean nextCustomPacketToRemote(ByteBuffer remotePacket) {
         return false;
     }
 }

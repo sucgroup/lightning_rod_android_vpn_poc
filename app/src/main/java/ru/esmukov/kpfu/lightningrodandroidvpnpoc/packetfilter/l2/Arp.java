@@ -14,20 +14,43 @@ class Arp {
     private static final short OPCODE_REQUEST = 0x1;
     private static final short OPCODE_REPLY = 0x2;
 
-    public static ByteBuffer createRequest(long localMac, int localIp, int targetIp) {
-        return createPacket(OPCODE_REQUEST,
+    /**
+     * ARP Request frame (L2 packet with Ethernet headers)
+     *
+     * @param localMac
+     * @param localIp
+     * @param targetIp
+     * @return
+     */
+    static ByteBuffer createRequestFrame(long localMac, int localIp, int targetIp) {
+        return createFrame(OPCODE_REQUEST,
                 localMac, localIp,
-                0xffffffffffffL, targetIp);
+                EthernetHeader.BROADCAST_MAC, targetIp);
     }
 
-    public static ByteBuffer createResponse(long localMac, ArpRequest arpRequest) {
-        return createPacket(OPCODE_REPLY,
+    /**
+     * ARP Response frame (L2 packet with Ethernet headers)
+     *
+     * @param localMac
+     * @param arpRequest
+     * @return
+     */
+    static ByteBuffer createResponseFrame(long localMac, ArpRequest arpRequest) {
+        return createFrame(OPCODE_REPLY,
                 localMac, arpRequest.getRequestedIp(),
                 arpRequest.getRequesterMac(), arpRequest.getRequesterIp());
     }
 
-    public static ArpPacket parsePacket(ByteBuffer packet) throws Exception {
+    /**
+     * Parse L3 packet (without Ethernet headers)
+     *
+     * @param packet
+     * @return
+     * @throws Exception
+     */
+    static ArpPacket parsePacket(ByteBuffer packet) throws Exception {
         packet.position(0);
+
         short hardwareType = packet.getShort();
         short protocolType = packet.getShort();
         byte hardwareSize = packet.get();
@@ -54,6 +77,58 @@ class Arp {
         return ArpPacket.create(opcode, senderMac, senderIp, targetMac, targetIp);
     }
 
+    /**
+     * Create L3 ARP packet
+     *
+     * @param opcode
+     * @param senderMac
+     * @param senderIp
+     * @param targetMac
+     * @param targetIp
+     * @return
+     */
+    private static ByteBuffer createPacket(short opcode,
+                                           long senderMac, int senderIp,
+                                           long targetMac, int targetIp) {
+        ByteBuffer packet = ByteBuffer.allocate(256);
+        packet.position(0);
+
+        packet.putShort(HARDWARE_TYPE_ETHERNET); // hardware type -- ethernet
+        packet.putShort((short) EthernetHeader.TYPE_IP); // protocol type -- IP
+        packet.put((byte) 6); // hardware size
+        packet.put((byte) 4); // protocol size
+        packet.putShort(opcode); // opcode -- createRequestFrame
+
+        ByteBufferUtils.put6bytes(packet, senderMac);
+        packet.putInt(senderIp);
+        ByteBufferUtils.put6bytes(packet, targetMac);
+        packet.putInt(targetIp);
+
+        packet.limit(packet.position());
+        packet.position(0);
+
+        return packet;
+    }
+
+    /**
+     * Create ARP frame (L2 Ethernet headers + L3 ARP packet)
+     *
+     * @param opcode
+     * @param senderMac
+     * @param senderIp
+     * @param targetMac
+     * @param targetIp
+     * @return
+     */
+    private static ByteBuffer createFrame(short opcode,
+                                          long senderMac, int senderIp,
+                                          long targetMac, int targetIp) {
+        ByteBuffer packet = createPacket(opcode, senderMac, senderIp, targetMac, targetIp);
+
+        new EthernetHeader(senderMac, targetMac, EthernetHeader.TYPE_ARP).addToPacket(packet);
+
+        return packet;
+    }
 
     static class ArpPacket {
         protected long mSenderMac;
@@ -69,7 +144,8 @@ class Arp {
             mTargetIp = targetIp;
         }
 
-        private static ArpPacket create(short opcode, long senderMac, int senderIp,
+        private static ArpPacket create(short opcode,
+                                        long senderMac, int senderIp,
                                         long targetMac, int targetIp) throws Exception {
 
             if (opcode == OPCODE_REPLY)
@@ -84,61 +160,36 @@ class Arp {
     }
 
     static class ArpReply extends ArpPacket {
-
-        ArpReply(long senderMac, int senderIp, long targetMac, int targetIp) throws Exception {
+        private ArpReply(long senderMac, int senderIp,
+                         long targetMac, int targetIp) throws Exception {
             super(senderMac, senderIp, targetMac, targetIp);
         }
 
-        public long getReplyerMac() {
+        long getReplyerMac() {
             return mSenderMac;
         }
 
-        public int getReplyerIp() {
+        int getReplyerIp() {
             return mSenderIp;
         }
     }
 
     static class ArpRequest extends ArpPacket {
-        public ArpRequest(long senderMac, int senderIp, long targetMac, int targetIp) throws Exception {
+        private ArpRequest(long senderMac, int senderIp,
+                           long targetMac, int targetIp) throws Exception {
             super(senderMac, senderIp, targetMac, targetIp);
         }
 
-        public long getRequesterMac() {
+        long getRequesterMac() {
             return mSenderMac;
         }
 
-        public int getRequesterIp() {
+        int getRequesterIp() {
             return mSenderIp;
         }
 
-        public int getRequestedIp() {
+        int getRequestedIp() {
             return mTargetIp;
         }
     }
-
-    private static ByteBuffer createPacket(short opcode,
-                                           long senderMac, int senderIp,
-                                           long targetMac, int targetIp) {
-        ByteBuffer packet = ByteBuffer.allocate(256);
-        packet.position(0);
-
-        packet.putShort(HARDWARE_TYPE_ETHERNET); // hardware type -- ethernet
-        packet.putShort((short) EthernetHeader.TYPE_IP); // protocol type -- IP
-        packet.put((byte) 6); // hardware size
-        packet.put((byte) 4); // protocol size
-        packet.putShort(opcode); // opcode -- createRequest
-
-        ByteBufferUtils.put6bytes(packet, senderMac);
-        packet.putInt(senderIp);
-        ByteBufferUtils.put6bytes(packet, targetMac);
-        packet.putInt(targetIp);
-
-        packet.limit(packet.position());
-
-        // todo move this
-        new EthernetHeader(senderMac, targetMac, EthernetHeader.TYPE_ARP).addToPacket(packet);
-
-        return packet;
-    }
-
 }

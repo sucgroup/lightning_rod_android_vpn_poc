@@ -23,8 +23,8 @@ class L3PacketInfo {
     private static final int ETH_P_IP = 0x0800;
     // private static final int ETH_P_IPV6 = 0x86DD;
 
-    static boolean fromLocalToRemote(ByteBuffer packet) {
-        int length = packet.limit();
+    static boolean fromLocalToRemote(ByteBuffer ip4Packet) {
+        int length = ip4Packet.limit();
 
         // todo looks like we don't need to ever set the TUN_PKT_STRIP flag, right?
         // see:
@@ -37,18 +37,18 @@ class L3PacketInfo {
         short flags = 0;
         short proto = ETH_P_IP;
 
-        ByteBufferUtils.moveRight(packet, 4);
+        ByteBufferUtils.moveRight(ip4Packet, 4);
 
-        packet.putShort(0, flags);
-        packet.putShort(2, proto);
+        ip4Packet.putShort(0, flags);
+        ip4Packet.putShort(2, proto);
 
         // packet.limit(length + 4);
 
         return true;
     }
 
-    static boolean fromRemoteToLocal(ByteBuffer packet) {
-        int length = packet.limit();
+    static boolean fromRemoteToLocal(ByteBuffer remotePacket) {
+        int length = remotePacket.limit();
 
         if (length < 4) {
             Log.i(TAG, "dropped packet with invalid length (<4)");
@@ -62,8 +62,8 @@ class L3PacketInfo {
         };
          */
 
-        int flags = ((packet.get(0) & 0xFF) << 8) | (packet.get(1) & 0xFF);
-        int proto = ((packet.get(2) & 0xFF) << 8) | (packet.get(3) & 0xFF);
+        int flags = ((remotePacket.get(0) & 0xFF) << 8) | (remotePacket.get(1) & 0xFF);
+        int proto = ((remotePacket.get(2) & 0xFF) << 8) | (remotePacket.get(3) & 0xFF);
 
         if (flags != 0) {
             Log.w(TAG, "received non-zero flags: " + flags);
@@ -80,7 +80,7 @@ class L3PacketInfo {
         //                             void *msg_control, struct iov_iter *from,
         //                             int noblock)
 
-        ByteBufferUtils.moveLeft(packet, 4);
+        ByteBufferUtils.moveLeft(remotePacket, 4);
 
         return true;
     }
