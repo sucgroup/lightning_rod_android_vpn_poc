@@ -1,8 +1,10 @@
 package ru.esmukov.kpfu.lightningrodandroidvpnpoc;
 
 import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.net.VpnService;
 import android.os.Handler;
 import android.os.Message;
@@ -34,6 +36,15 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
     private Thread mThread;
     private ParcelFileDescriptor mInterface;
 
+    private final BroadcastReceiver receiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (mThread != null) {
+                mThread.interrupt();
+            }
+        }
+    };
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -43,6 +54,10 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
             throw new IllegalStateException("Application context is null");
         }
         prepare(context);
+
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(getPackageName() + ".intent.VpnDisconnect");
+        registerReceiver(receiver, filter);
     }
 
     @Override

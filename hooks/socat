@@ -119,10 +119,9 @@ run_apk() {
     # todo capture exit code of a subshell
     get_vpnservice_configuration
 
-    am startservice -e \
-    ru.esmukov.kpfu.lightningrodandroidvpnpoc.CONFIGURATION \
-    "`get_vpnservice_configuration`" \
-    ru.esmukov.kpfu.lightningrodandroidvpnpoc/ru.esmukov.kpfu.lightningrodandroidvpnpoc.SocatVpnService
+    am broadcast --user 0 \
+    -a ru.esmukov.kpfu.lightningrodandroidvpnpoc.intent.VpnConnect \
+    --es configuration "`get_vpnservice_configuration`"
 
     trap "stop_vpnservice" SIGINT SIGTERM
 
@@ -137,8 +136,8 @@ run_apk() {
 stop_vpnservice() {
     # todo running multiple vpnservices this way seems impossible
 
-    am stopservice \
-    ru.esmukov.kpfu.lightningrodandroidvpnpoc/ru.esmukov.kpfu.lightningrodandroidvpnpoc.SocatVpnService
+    am broadcast --user 0 \
+    -a ru.esmukov.kpfu.lightningrodandroidvpnpoc.intent.VpnDisconnect
 
     exit $?
 }
