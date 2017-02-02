@@ -77,7 +77,8 @@ get_vpnservice_configuration_tun() {
 
     [ "TUN" != "$ADDR2_TYPE" ] && failexit "Assertion failed: other address must be a TUN"
 
-    echo "$ADDR2_PARAMS" | grep -q "tun-type=tun" || failexit "Only tun-type=tun is supported"
+    echo "$ADDR2_PARAMS" | grep -qE "tun-type=(tun|tap)" || failexit "Only tun-type=tun and tap are supported"
+    echo "$ADDR2_PARAMS" | grep -q "tun-type=tap" && printf " o,tap"
 
     # append local TUN address a,10.123.123.2,24
     printf " a,"
