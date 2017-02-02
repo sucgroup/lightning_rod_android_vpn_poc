@@ -114,8 +114,12 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
                 Thread.sleep(3000);
             }
             Log.i(TAG, "Giving up");
+            mHandler.sendEmptyMessage(R.string.disconnected);
+        } catch (IllegalStateException e) {
+            Log.e(TAG, "Got " + e.toString());
         } catch (Exception e) {
             Log.e(TAG, "Got " + e.toString());
+            mHandler.sendEmptyMessage(R.string.disconnected);
         } finally {
             try {
                 mInterface.close();
@@ -123,7 +127,7 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
                 // ignore
             }
             mInterface = null;
-            mHandler.sendEmptyMessage(R.string.disconnected);
+
             Log.i(TAG, "Exiting");
         }
     }
@@ -140,6 +144,7 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
             // Protect the tunnel before connecting to avoid loopback.
 
             if (!tunnel.protect(this)) {
+                mHandler.sendEmptyMessage(R.string.no_consent);
                 throw new IllegalStateException("Cannot protect the tunnel");
             }
             // For simplicity, we use the same thread for both reading and
@@ -215,7 +220,7 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
                     Thread.sleep(30);
                 }
             }
-        } catch (InterruptedException e) {
+        } catch (IllegalStateException | InterruptedException e) {
             throw e;
         } catch (Exception e) {
             Log.e(TAG, "Got " + e.toString());

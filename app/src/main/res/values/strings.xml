@@ -10,4 +10,7 @@
     <string name="connecting">SocatVpnService is connecting...</string>
     <string name="connected">SocatVpnService is connected!</string>
     <string name="disconnected">SocatVpnService is disconnected!</string>
+
+    <string name="no_consent">SocatVpnService is unable to start. Please open the GUI,
+        click the button and allow establishing VPN tunnel.</string>
 </resources>
