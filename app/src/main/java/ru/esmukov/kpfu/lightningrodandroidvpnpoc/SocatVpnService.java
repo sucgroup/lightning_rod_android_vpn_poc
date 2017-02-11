@@ -49,12 +49,6 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
     public void onCreate() {
         super.onCreate();
 
-        Context context = getApplicationContext();
-        if (context == null) {
-            throw new IllegalStateException("Application context is null");
-        }
-        prepare(context);
-
         IntentFilter filter = new IntentFilter();
         filter.addAction(getPackageName() + ".intent.VpnDisconnect");
         registerReceiver(receiver, filter);
@@ -62,6 +56,11 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        Context context = getApplicationContext();
+        if (context == null) {
+            throw new IllegalStateException("Application context is null");
+        }
+
         // The handler is only used to show messages.
         if (mHandler == null) {
             mHandler = new Handler(this);
@@ -70,6 +69,12 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
         if (mThread != null) {
             mThread.interrupt();
         }
+
+        if (prepare(context) != null) {
+            mHandler.sendEmptyMessage(R.string.no_consent);
+            return START_NOT_STICKY;
+        }
+
         // Extract information from the intent.
         String prefix = getPackageName();
         mSocatServerConnectionInfo = new SocatServerConnectionInfo(

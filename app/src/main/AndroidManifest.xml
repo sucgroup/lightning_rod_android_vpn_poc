@@ -12,7 +12,7 @@
         <activity
             android:name=".SocatVpnActivity"
             android:label="@string/title_activity_main" >
-            <intent-filter >
+            <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
@@ -27,12 +27,12 @@
             </intent-filter>
         </service>
 
-        <receiver android:name=".SocatVpnServiceReceiver" android:enabled="true">
-            <intent-filter android:priority="999">
+        <service android:name=".BroadcastsListenerService">
+            <intent-filter>
                 <action android:name=
                     "ru.esmukov.kpfu.lightningrodandroidvpnpoc.intent.VpnConnect" />
             </intent-filter>
-        </receiver>
+        </service>
     </application>
 
 </manifest>

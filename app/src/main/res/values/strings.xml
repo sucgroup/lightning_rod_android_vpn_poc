@@ -4,13 +4,37 @@
 
     <string name="action_settings">Settings</string>
 
-    <string name="configuration">Configuration:</string>
-    <string name="connect">Connect!</string>
 
-    <string name="connecting">SocatVpnService is connecting...</string>
+    <!-- toasts -->
+    <string name="connecting">SocatVpnService is connecting…</string>
     <string name="connected">SocatVpnService is connected!</string>
     <string name="disconnected">SocatVpnService is disconnected!</string>
-
     <string name="no_consent">SocatVpnService is unable to start. Please open the GUI,
         click the button and allow establishing VPN tunnel.</string>
+
+
+    <!-- form layout -->
+    <string name="header_stop">Stop</string>
+    <string name="stop_description">Stop accepting broadcasts, stop active VpnConnection and
+        quit the app.</string>
+    <string name="stop_and_quit">Stop and quit</string>
+
+    <string name="header_manual_connect">Manual tunnel creation</string>
+    <string name="configuration">Configuration:</string>
+    <string name="connect">Connect</string>
+
+    <string name="header_no_consent">Consent is required</string>
+    <string name="no_consent_description">In order to be able to create VPN connections you must
+        give your consent for using Android Vpn Service.</string>
+    <string name="try_to_consent">Try again</string>
+
+
+    <string name="header_waiting_consent">Waiting for consent</string>
+    <string name="waiting_consent_description">A consent dialog should have been pop up.
+        Please read it carefully and continue.</string>
+
+    <!-- notification -->
+    <string name="notification_title">SocatVpnService</string>
+    <string name="notification_text">Listening for tunnel creation requests</string>
+
 </resources>
