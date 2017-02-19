@@ -117,6 +117,8 @@ get_vpnservice_configuration_server() {
 }
 
 run_apk() {
+    is_vpnservice_not_running && failexit "process is not running. Launch the SocatVpnActivity and retry."
+
     # todo capture exit code of a subshell
     get_vpnservice_configuration
 
@@ -126,9 +128,10 @@ run_apk() {
 
     trap "stop_vpnservice" SIGINT SIGTERM
 
-    # wait forever until a kill signal is received
     while :; do
-        # todo detect service failures
+        is_vpnservice_not_running && failexit "process has stopped"
+
+        # wait forever until a kill signal is received
         sleep 10 &
         wait
     done
@@ -141,6 +144,20 @@ stop_vpnservice() {
     -a ru.esmukov.kpfu.lightningrodandroidvpnpoc.intent.VpnDisconnect
 
     exit $?
+}
+
+is_vpnservice_not_running() {
+    # todo find a more reliable way to detect whether the service is running
+
+    # - `service list` / `service check` - works with system services only
+    # - `dumpsys activity services` - requires root or additional user permission
+
+    # If the process is absent, when both VpnService and BroadcastsListenerService
+    # are definitely not running.
+    # But is the process is present, they _might_ be running. But not certainly are.
+
+    pidof ru.esmukov.kpfu.lightningrodandroidvpnpoc > /dev/null
+    [ $? -ne 0 ]  # negate error code
 }
 
 
