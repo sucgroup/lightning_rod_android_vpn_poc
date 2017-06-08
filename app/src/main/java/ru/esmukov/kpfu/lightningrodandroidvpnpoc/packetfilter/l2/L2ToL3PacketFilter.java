@@ -4,15 +4,16 @@ import android.util.Log;
 
 import java.nio.ByteBuffer;
 
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l2.EthernetHeader;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.ByteBufferUtils;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.PacketFilter;
-import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.PacketInfo;
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l2.PacketInfo;
 
 /**
  * Created by kostya on 16/12/2016.
  */
 
-public class L2ToL3PacketFilter implements PacketFilter {
+public class L2ToL3PacketFilter /*implements PacketFilter*/ {
     private static final String TAG = "L2ToL3PacketFilter";
 
     private MacResolver mMacResolver = new MacResolver(
@@ -30,7 +31,7 @@ public class L2ToL3PacketFilter implements PacketFilter {
      * @param ip4Packet Local IP4 packet
      * @return Should the packet be sent? Drop it otherwise.
      */
-    @Override
+//    @Override
     public boolean fromLocalToRemote(ByteBuffer ip4Packet) {
         Long destinationMac = mMacResolver.getDestinationMacAddressByL3IpPacket(ip4Packet);
 
@@ -56,7 +57,7 @@ public class L2ToL3PacketFilter implements PacketFilter {
      * @param remotePacket Raw L2 packet
      * @return Should the packet be accepted? Drop it otherwise.
      */
-    @Override
+//    @Override
     public boolean fromRemoteToLocal(ByteBuffer remotePacket) {
         int packetInfoProto = -1;
         if (mPacketInfo) {
@@ -108,7 +109,7 @@ public class L2ToL3PacketFilter implements PacketFilter {
      * @param remotePacket Any buffer
      * @return Is a packet to be sent put to the `remotePacket` buffer
      */
-    @Override
+//    @Override
     public boolean nextCustomPacketToRemote(ByteBuffer remotePacket) {
         MacResolver.CustomPacket customPacket = mMacResolver.pollPacketFromQueue();
 

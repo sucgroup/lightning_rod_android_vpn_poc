@@ -1,4 +1,4 @@
-package ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.l2;
+package ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l2;
 
 import java.nio.ByteBuffer;
 

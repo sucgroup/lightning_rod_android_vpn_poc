@@ -36,8 +36,8 @@ class UdpServerConnect implements ServerConnection {
     }
 
     @Override
-    public void write(ByteBuffer source) throws IOException {
-        mSocket.write(source);
+    public int write(ByteBuffer source) throws IOException {
+        return mSocket.write(source);
     }
 
     @Override
