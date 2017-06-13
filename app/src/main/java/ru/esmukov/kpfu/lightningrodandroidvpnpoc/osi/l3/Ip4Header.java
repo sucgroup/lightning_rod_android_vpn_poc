@@ -29,4 +29,9 @@ public class Ip4Header implements L3Header {
     public int getMinimumHeaderLength() {
         return 20;
     }
+
+    @Override
+    public boolean isMatch(ByteBuffer packet) {
+        return packet.limit() >= 1 && (packet.get(0) >> 4) == 4;
+    }
 }

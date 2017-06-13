@@ -21,4 +21,9 @@ public class Ip6Header implements L3Header {
         len |= packet.get(5) & 0xFF;
         return len;
     }
+
+    @Override
+    public boolean isMatch(ByteBuffer packet) {
+        return packet.limit() >= 1 && (packet.get(0) >> 4) == 6;
+    }
 }

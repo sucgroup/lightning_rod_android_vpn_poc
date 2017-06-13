@@ -11,4 +11,7 @@ public interface L3Header {
     int getMinimumHeaderLength();
 
     int getTotalLength(ByteBuffer packet);
+
+    boolean isMatch(ByteBuffer packet);
+
 }

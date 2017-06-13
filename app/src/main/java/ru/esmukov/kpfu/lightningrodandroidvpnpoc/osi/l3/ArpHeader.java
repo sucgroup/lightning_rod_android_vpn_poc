@@ -204,4 +204,9 @@ public class ArpHeader implements L3Header {
     public int getTotalLength(ByteBuffer packet) {
         return 28;
     }
+
+    @Override
+    public boolean isMatch(ByteBuffer packet) {
+        return packet.limit() >= 2 && packet.getShort() == HARDWARE_TYPE_ETHERNET;
+    }
 }

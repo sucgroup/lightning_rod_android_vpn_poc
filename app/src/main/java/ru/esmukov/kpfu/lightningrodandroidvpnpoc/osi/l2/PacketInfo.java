@@ -10,6 +10,8 @@ import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.ByteBufferUtils;
  * Created by kostya on 06/01/2017.
  */
 
+// http://elixir.free-electrons.com/linux/latest/source/drivers/net/tun.c
+
 public class PacketInfo {
     private static final String TAG = "PacketInfo";
 

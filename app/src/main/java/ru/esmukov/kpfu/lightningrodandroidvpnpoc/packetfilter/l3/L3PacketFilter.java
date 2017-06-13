@@ -7,8 +7,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l3.Ip4Header;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l3.L3Header;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l3.L3HeaderFacade;
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.BufLogger;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.PacketFilter;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l2.PacketInfo;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l2.EthernetHeader;
@@ -23,7 +25,6 @@ public class L3PacketFilter implements PacketFilter {
 
     private boolean mPacketInfo;
 
-    private final ByteBuffer ip4HeaderBuffer = ByteBuffer.allocate(L3HeaderFacade.ip4Header.getMinimumHeaderLength());
     private final ByteBuffer packetInfoBuffer = ByteBuffer.allocate(PacketInfo.PI_LEN);
     private final ByteBuffer l3HeaderBuffer = ByteBuffer.allocate(L3HeaderFacade.MAX_L3_HEADER_LEN);
     // max IP packet length is 0xff^2 (len field size in header)
@@ -42,18 +43,15 @@ public class L3PacketFilter implements PacketFilter {
     public boolean consumeRemote(ServerConnection tunnel) throws IOException {
         // this method consumes single IP packet
 
-        int etherType;
         L3Header l3Header;
         if (mPacketInfo) {
-            if (!readPi(tunnel))
+            l3Header = readL3HeaderWithPi(tunnel);
+            if (l3Header == null)
                 return false;
-            etherType = PacketInfo.getAtPos(packetInfoBuffer, 0).getProto();
-            l3Header = getL3HeaderByEtherType(etherType);
-            while (!readL3Header(tunnel, l3Header)); // we have read PI - we must wait for the header then
         } else {
             // We make IPv4 tunnels only. When PI is absent, only IPv4 packets
             // might be sent by the remote here.
-            etherType = L3HeaderFacade.TYPE_IP;
+            int etherType = L3HeaderFacade.TYPE_IP;
             l3Header = getL3HeaderByEtherType(etherType);
             if (!readL3Header(tunnel, l3Header))
                 return false;
@@ -67,9 +65,9 @@ public class L3PacketFilter implements PacketFilter {
         while (inBuffer.position() < inBuffer.limit()) {
             tunnel.read(inBuffer);
         }
-        if (etherType != L3HeaderFacade.TYPE_IP) {
+        if (!(l3Header instanceof Ip4Header)) {
             // eat up that junk packet, which VpnService will not understand
-            Log.w(TAG, "received non-IP etherType: " + etherType);
+            Log.w(TAG, "received non-IP etherType: " + l3Header);
             inBuffer.limit(0);
         }
         // BufLogger.logIncoming(inBuffer);
@@ -121,13 +119,7 @@ public class L3PacketFilter implements PacketFilter {
             writePi(tunnel);
         }
         write(tunnel, outBuffer);
-//        BufLogger.logOutgoing(outBuffer);
         outBuffer.limit(0);
-//        try { /////////
-//            Thread.sleep(30);
-//        } catch (InterruptedException e) {
-//
-//        }
         return true;
     }
 
@@ -135,6 +127,36 @@ public class L3PacketFilter implements PacketFilter {
         l3HeaderBuffer.position(0);
         l3HeaderBuffer.limit(l3Header.getMinimumHeaderLength());
         return readHeader(tunnel, l3HeaderBuffer);
+    }
+
+    private L3Header readL3HeaderWithPi(ServerConnection tunnel) throws IOException {
+        L3Header l3Header = null;
+        while (true) {
+            packetInfoBuffer.position(0);
+            packetInfoBuffer.limit(packetInfoBuffer.capacity());
+            if (!readHeader(tunnel, packetInfoBuffer))
+                break;
+
+            if (l3Header != null) {
+                // we need to determine what have we just read: another PI or a real packet
+                packetInfoBuffer.position(0);
+                if (l3Header.isMatch(packetInfoBuffer))
+                    break; // it's the real packet here
+                // it was an another PI - go on
+            }
+            int etherType = PacketInfo.getAtPos(packetInfoBuffer, 0).getProto();
+            l3Header = getL3HeaderByEtherType(etherType);
+        }
+        if (l3Header == null)
+            return null;
+
+        packetInfoBuffer.position(0);
+        l3HeaderBuffer.position(0);
+        l3HeaderBuffer.limit(l3Header.getMinimumHeaderLength());
+        l3HeaderBuffer.put(packetInfoBuffer);
+
+        while (!readHeader(tunnel, l3HeaderBuffer));
+        return l3Header;
     }
 
     private void writePi(ServerConnection tunnel) throws IOException {
@@ -145,17 +167,11 @@ public class L3PacketFilter implements PacketFilter {
     }
 
     private void write(ServerConnection tunnel, ByteBuffer buffer) throws IOException {
-        int toWrite = outBuffer.limit();
-        outBuffer.position(0);
+        int toWrite = buffer.limit();
+        buffer.position(0);
         while (toWrite > 0) {
-            toWrite -= tunnel.write(outBuffer);
+            toWrite -= tunnel.write(buffer);
         }
-    }
-
-    private boolean readPi(ServerConnection tunnel) throws IOException {
-        packetInfoBuffer.position(0);
-        packetInfoBuffer.limit(packetInfoBuffer.capacity());
-        return readHeader(tunnel, packetInfoBuffer);
     }
 
     private boolean readHeader(ServerConnection tunnel, ByteBuffer target) throws IOException {
