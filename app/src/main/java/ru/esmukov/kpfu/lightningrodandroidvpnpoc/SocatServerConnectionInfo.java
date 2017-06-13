@@ -141,8 +141,7 @@ public class SocatServerConnectionInfo {
 
     public PacketFilter createNewPacketFilter() {
         if (mIsTap) {
-            throw new RuntimeException("Not implemented");
-//            return new L2ToL3PacketFilter(mPacketInfo);
+            return new L2ToL3PacketFilter(mPacketInfo);
         } else {
             return new L3PacketFilter(mPacketInfo);
         }

@@ -196,7 +196,7 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
         } catch (IllegalStateException | InterruptedException e) {
             throw e;
         } catch (Exception e) {
-            Log.e(TAG, "Got " + e.toString());
+            Log.e(TAG, "Got " + e.toString(), e);
         } finally {
             try {
                 if (tunnel != null)

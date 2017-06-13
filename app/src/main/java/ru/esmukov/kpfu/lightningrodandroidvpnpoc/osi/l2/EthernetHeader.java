@@ -16,7 +16,7 @@ public class EthernetHeader {
 
     public static final long BROADCAST_MAC = 0xff_ff_ff_ff_ff_ffL;
 
-    private static final int ETHERNET_HEADER_LENGTH = 6 + 6 + 2;
+    public static final int ETHERNET_HEADER_LENGTH = 6 + 6 + 2;
 
     private long mDestinationMac; // 6 bytes
     private long mSourceMac; // 6 bytes
@@ -30,7 +30,7 @@ public class EthernetHeader {
         mEtherType = etherType;
     }
 
-    public static EthernetHeader stripFromFrame(ByteBuffer frame) {
+    public static EthernetHeader fromFrame(ByteBuffer frame) {
         long destinationMac = frame.getLong(0);
         // strip 2 extra bytes (8 bytes of long - 6 bytes of mac)
         destinationMac = destinationMac >>> (2 * 8);
@@ -39,8 +39,6 @@ public class EthernetHeader {
         sourceMac = sourceMac >>> (2 * 8);
 
         int etherType = getEtherType(frame);
-
-        ByteBufferUtils.moveLeft(frame, ETHERNET_HEADER_LENGTH);
 
         return new EthernetHeader(destinationMac, sourceMac, etherType);
     }
@@ -71,5 +69,9 @@ public class EthernetHeader {
 
     public int getEtherType() {
         return mEtherType;
+    }
+
+    public static boolean isMatch(ByteBuffer packet, int expectedEtherType) {
+        return packet.limit() >= 8 && getEtherType(packet) == expectedEtherType;
     }
 }

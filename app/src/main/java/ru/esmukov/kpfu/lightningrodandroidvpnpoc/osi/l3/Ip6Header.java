@@ -9,9 +9,11 @@ import java.nio.ByteBuffer;
 public class Ip6Header implements L3Header {
     // https://en.wikipedia.org/wiki/IPv6_packet
 
+    private static final int IP6_HEADER_LENGTH = 40;
+
     @Override
     public int getMinimumHeaderLength() {
-        return 40;
+        return IP6_HEADER_LENGTH;
     }
 
     @Override
@@ -19,7 +21,7 @@ public class Ip6Header implements L3Header {
         int len = 0;
         len |= (packet.get(4) & 0xFF) << 8;
         len |= packet.get(5) & 0xFF;
-        return len;
+        return len + IP6_HEADER_LENGTH;
     }
 
     @Override
