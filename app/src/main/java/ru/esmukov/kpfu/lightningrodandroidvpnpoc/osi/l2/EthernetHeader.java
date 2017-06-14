@@ -50,11 +50,11 @@ public class EthernetHeader {
     public void addToPacket(ByteBuffer packet) {
         ByteBufferUtils.moveRight(packet, ETHERNET_HEADER_LENGTH);
 
-        packet.putShort(0, (short) ((mSourceMac >>> (4 * 8)) & 0xFFFF));
-        packet.putInt(2, (int) (mSourceMac & 0xFFFFFFFFL));
+        packet.putShort(0, (short) ((mDestinationMac >>> (4 * 8)) & 0xFFFF));
+        packet.putInt(2, (int) (mDestinationMac & 0xFFFFFFFFL));
 
-        packet.putShort(6, (short) ((mDestinationMac >>> (4 * 8)) & 0xFFFF));
-        packet.putInt(8, (int) (mDestinationMac & 0xFFFFFFFFL));
+        packet.putShort(6, (short) ((mSourceMac >>> (4 * 8)) & 0xFFFF));
+        packet.putInt(8, (int) (mSourceMac & 0xFFFFFFFFL));
 
         packet.putShort(6 + 6, (short) (mEtherType & 0xFFFF));
     }

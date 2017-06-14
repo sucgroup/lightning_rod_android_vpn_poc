@@ -127,7 +127,7 @@ public class ArpHeader implements L3Header {
                                           long targetMac, int targetIp) {
         ByteBuffer packet = createPacket(opcode, senderMac, senderIp, targetMac, targetIp);
 
-        new EthernetHeader(senderMac, targetMac, EthernetHeader.TYPE_ARP).addToPacket(packet);
+        new EthernetHeader(targetMac, senderMac, EthernetHeader.TYPE_ARP).addToPacket(packet);
 
         return packet;
     }

@@ -112,7 +112,7 @@ public class L2ToL3PacketFilter extends BasePacketFilter implements PacketFilter
             writePi(tunnel, EthernetHeader.getEtherType(outTunBuffer));
         }
 
-        BufLogger.logOutgoing(outTunBuffer);
+//        BufLogger.logOutgoing(outTunBuffer);
         write(tunnel, outTunBuffer);
         outTunBuffer.limit(0);
         return true;
@@ -122,7 +122,7 @@ public class L2ToL3PacketFilter extends BasePacketFilter implements PacketFilter
         packetInfoBuffer.position(0);
         packetInfoBuffer.limit(packetInfoBuffer.capacity());
         PacketInfo.writeAtPos(packetInfoBuffer, 0, etherType);
-        BufLogger.logOutgoing(packetInfoBuffer);
+//        BufLogger.logOutgoing(packetInfoBuffer);
         write(tunnel, packetInfoBuffer);
     }
 
