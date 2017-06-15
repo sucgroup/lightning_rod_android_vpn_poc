@@ -164,8 +164,6 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
             FileInputStream in = new FileInputStream(mInterface.getFileDescriptor());
             // Packets received need to be written to this output stream.
             FileOutputStream out = new FileOutputStream(mInterface.getFileDescriptor());
-            // Allocate the buffer for a single packet.
-//            ByteBuffer packet = ByteBuffer.allocate(32767);
 
             PacketFilter packetFilter = mSocatServerConnectionInfo.createNewPacketFilter();
 
