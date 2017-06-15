@@ -2,128 +2,179 @@ package ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.l2;
 
 import android.util.Log;
 
-import java.nio.ByteBuffer;
+import java.io.FileInputStream;
+import java.io.IOException;
 
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l2.EthernetHeader;
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l3.ArpHeader;
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l3.Ip4Header;
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l3.Ip6Header;
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l3.L3Header;
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.BasePacketFilter;
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.BufLogger;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.ByteBufferUtils;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.PacketFilter;
-import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.PacketInfo;
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l2.PacketInfo;
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.serverconnection.ServerConnection;
 
 /**
  * Created by kostya on 16/12/2016.
  */
 
-public class L2ToL3PacketFilter implements PacketFilter {
+public class L2ToL3PacketFilter extends BasePacketFilter implements PacketFilter {
     private static final String TAG = "L2ToL3PacketFilter";
 
     private MacResolver mMacResolver = new MacResolver(
             LocalMacAddressGenerator.generateRandomLocallyAdministeredMacAddress());
 
-    private boolean mPacketInfo;
-
     public L2ToL3PacketFilter(boolean packetInfo) {
-        mPacketInfo = packetInfo;
+        super(packetInfo);
     }
 
-    /**
-     * Prepend L2 headers to an outgoing L3 IP4 packet
-     *
-     * @param ip4Packet Local IP4 packet
-     * @return Should the packet be sent? Drop it otherwise.
-     */
     @Override
-    public boolean fromLocalToRemote(ByteBuffer ip4Packet) {
-        Long destinationMac = mMacResolver.getDestinationMacAddressByL3IpPacket(ip4Packet);
-
-        if (destinationMac == null) {
-            mMacResolver.resolveMacAndQueueL3IpPacket(ip4Packet);
-            // unknown destination mac as for now.
-            return false;
-        }
-
-        EthernetHeader ethernetHeader = new EthernetHeader(destinationMac,
-                mMacResolver.getLocalMacAddress(), EthernetHeader.TYPE_IP);
-        ethernetHeader.addToPacket(ip4Packet);
-
-        if (mPacketInfo) {
-            PacketInfo.prepend(ip4Packet, ethernetHeader.getEtherType());
-        }
-        return true;
-    }
-
-    /**
-     * Strip L2 headers and accept L3 IP4 packets only
-     *
-     * @param remotePacket Raw L2 packet
-     * @return Should the packet be accepted? Drop it otherwise.
-     */
-    @Override
-    public boolean fromRemoteToLocal(ByteBuffer remotePacket) {
-        int packetInfoProto = -1;
-        if (mPacketInfo) {
-            try {
-                packetInfoProto = PacketInfo.strip(remotePacket).getProto();
-            } catch (Exception e) {
-                Log.i(TAG, "Packet info exception", e);
-                return false;
-            }
-        }
-
+    public boolean consumeRemote(ServerConnection tunnel) throws IOException {
         EthernetHeader ethernetHeader;
-        try {
-            ethernetHeader = EthernetHeader.stripFromFrame(remotePacket);
-        } catch (Exception e) {
-            Log.i(TAG, "ETHERNET bad incoming packet", e);
+        if (mPacketInfo) {
+            ethernetHeader = readL2HeaderWithPi(tunnel);
+        } else {
+            ethernetHeader = readL2Header(tunnel);
+        }
+        if (ethernetHeader == null)
             return false;
+
+        L3Header l3Header = getL3HeaderByEtherType(ethernetHeader.getEtherType());
+        while (!readL3Header(tunnel, l3Header));
+        int totalLen = l3Header.getTotalLength(inPacketHeaderBuffer);
+
+        // inIp4Buffer below contains any L3 packet, not just IPv4.
+        // but in the end only IPv4 packet will be left in this buffer.
+        assert inIp4Buffer.position() == inIp4Buffer.limit() && inIp4Buffer.position() == 0;
+
+        inIp4Buffer.limit(totalLen);
+        inIp4Buffer.put(inPacketHeaderBuffer);
+        while (inIp4Buffer.position() < inIp4Buffer.limit()) {
+            tunnel.read(inIp4Buffer);
         }
 
-        if (mPacketInfo && packetInfoProto != ethernetHeader.getEtherType()) {
-            Log.w(TAG, "PI type != etherType. Packet is probably corrupted. Dropped it.");
-            return false;
-        }
-
-        if (ethernetHeader.getEtherType() == EthernetHeader.TYPE_IP)
-            return mMacResolver.shouldFrameBeAccepted(ethernetHeader.getDestinationMac());
-
-        if (ethernetHeader.getEtherType() == EthernetHeader.TYPE_IPV6)
+        if (l3Header instanceof Ip4Header) {
+            if (!mMacResolver.shouldFrameBeAccepted(ethernetHeader.getDestinationMac()))
+                inIp4Buffer.limit(0); // drop foreign IPv4 packet
+        } else if (l3Header instanceof Ip6Header) {
             // silently drop any IPV6 communications
-            return false;
-
-        if (ethernetHeader.getEtherType() == EthernetHeader.TYPE_ARP) {
+            inIp4Buffer.limit(0);
+        } else if (l3Header instanceof ArpHeader) {
             try {
-                mMacResolver.processIncomingArpPacket(remotePacket);
+                mMacResolver.processIncomingArpPacket(inIp4Buffer);
             } catch (Exception e) {
                 Log.i(TAG, "ARP bad incoming packet", e);
+            } finally {
+                inIp4Buffer.limit(0);
             }
-            return false;
-        }
-
-        Log.i(TAG, "dropped packet with unknown etherType: " + ethernetHeader.getEtherType());
-        return false;
-    }
-
-    /**
-     * Send pending packet (i.e. outgoing ARP request,
-     * IP4 packet with recently resolved destination MAC)
-     *
-     * @param remotePacket Any buffer
-     * @return Is a packet to be sent put to the `remotePacket` buffer
-     */
-    @Override
-    public boolean nextCustomPacketToRemote(ByteBuffer remotePacket) {
-        MacResolver.CustomPacket customPacket = mMacResolver.pollPacketFromQueue();
-
-        if (customPacket == null)
-            return false;
-
-        ByteBufferUtils.copy(customPacket.getPacket(), remotePacket);
-
-        if (customPacket.isL3()) {
-            return this.fromLocalToRemote(remotePacket);
-        }
-
-        if (mPacketInfo) {
-            PacketInfo.prepend(remotePacket, EthernetHeader.getEtherType(remotePacket));
+        } else {
+            throw new RuntimeException("Unknown l3Header. (have you just added a new L3 header class?)");
         }
         return true;
     }
+
+    @Override
+    public boolean consumeLocal(FileInputStream in) throws IOException {
+        if (!super.consumeLocal(in))
+            return false;
+
+        convertL3ToL2();
+        return true;
+    }
+
+    @Override
+    public boolean produceRemote(ServerConnection tunnel) throws IOException {
+        boolean anyProduced = produceL2Packet(tunnel); // send packet in the buf
+
+        MacResolver.CustomPacket customPacket;
+
+        while (true) {
+            customPacket = mMacResolver.pollPacketFromQueue();
+            if (customPacket == null)
+                break;
+            ByteBufferUtils.copy(customPacket.getPacket(), outTunBuffer);
+            if (customPacket.isL3())
+                convertL3ToL2();  // might queue packet and empty the buf
+            anyProduced = produceL2Packet(tunnel) || anyProduced;
+        }
+        return anyProduced;
+    }
+
+    private boolean produceL2Packet(ServerConnection tunnel) throws IOException {
+        int toWrite = outTunBuffer.limit();
+        if (toWrite <= 0)
+            return false;
+
+        if (mPacketInfo) {
+            writePi(tunnel, EthernetHeader.getEtherType(outTunBuffer));
+        }
+
+//        BufLogger.logOutgoing(outTunBuffer);
+        write(tunnel, outTunBuffer);
+        outTunBuffer.limit(0);
+        return true;
+    }
+
+    private void writePi(ServerConnection tunnel, int etherType) throws IOException {
+        packetInfoBuffer.position(0);
+        packetInfoBuffer.limit(packetInfoBuffer.capacity());
+        PacketInfo.writeAtPos(packetInfoBuffer, 0, etherType);
+//        BufLogger.logOutgoing(packetInfoBuffer);
+        write(tunnel, packetInfoBuffer);
+    }
+
+    private void convertL3ToL2() {
+        // outTunBuffer is an IP4 packet
+        Long destinationMac = mMacResolver.getDestinationMacAddressByL3IpPacket(outTunBuffer);
+
+        if (destinationMac == null) {
+            mMacResolver.resolveMacAndQueueL3IpPacket(outTunBuffer);
+            // unknown destination mac as for now - remove the packet
+            outTunBuffer.limit(0);
+        } else {
+            // we know destination mac - keep that packet in the buffer
+            EthernetHeader ethernetHeader = new EthernetHeader(destinationMac,
+                    mMacResolver.getLocalMacAddress(), EthernetHeader.TYPE_IP);
+            ethernetHeader.addToPacket(outTunBuffer);
+        }
+    }
+
+    private EthernetHeader readL2HeaderWithPi(ServerConnection tunnel) throws IOException {
+        int etherType = -1;
+        inPacketHeaderBuffer.position(0);
+        inPacketHeaderBuffer.limit(EthernetHeader.ETHERNET_HEADER_LENGTH);
+        while (true) {
+            // fill buf
+            if (!readHeader(tunnel, inPacketHeaderBuffer))
+                break;
+
+            if (etherType != -1) {
+                // we need to determine what have we just read: another PI or a real packet
+                if (EthernetHeader.isMatch(inPacketHeaderBuffer, etherType))
+                    // it's the real packet here
+                    return EthernetHeader.fromFrame(inPacketHeaderBuffer);
+                // it was an another PI - go on
+            }
+            etherType = PacketInfo.getAtPos(inPacketHeaderBuffer, 0).getProto();
+
+            // strip off PI
+            int oldLen = inPacketHeaderBuffer.limit();
+            ByteBufferUtils.moveLeft(inPacketHeaderBuffer, PacketInfo.PI_LEN);
+            inPacketHeaderBuffer.position(oldLen - PacketInfo.PI_LEN);
+            inPacketHeaderBuffer.limit(oldLen);
+        }
+        return null;
+    }
+
+    private EthernetHeader readL2Header(ServerConnection tunnel) throws IOException {
+        inPacketHeaderBuffer.position(0);
+        inPacketHeaderBuffer.limit(EthernetHeader.ETHERNET_HEADER_LENGTH);
+        if (!readHeader(tunnel, inPacketHeaderBuffer))
+            return null;
+        return EthernetHeader.fromFrame(inPacketHeaderBuffer);
+    }
+
 }

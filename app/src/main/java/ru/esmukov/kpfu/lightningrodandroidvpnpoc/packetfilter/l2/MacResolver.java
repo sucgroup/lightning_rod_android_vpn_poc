@@ -6,6 +6,10 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
 
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l2.EthernetHeader;
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l3.ArpHeader;
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l3.Ip4Header;
+
 /**
  * Created by kostya on 16/12/2016.
  */
@@ -40,7 +44,7 @@ class MacResolver {
         int destinationIp = Ip4Header.getDestinationIp(ip4Packet);
 
         mPacketDeque.add(CustomPacket.fromL2Packet(
-                Arp.createRequestFrame(getLocalMacAddress(),
+                ArpHeader.createRequestFrame(getLocalMacAddress(),
                         Ip4Header.getSourceIp(ip4Packet), destinationIp)
         ));
 
@@ -58,20 +62,20 @@ class MacResolver {
     }
 
     void processIncomingArpPacket(ByteBuffer l3ArpPacket) throws Exception {
-        Arp.ArpPacket arpPacket = Arp.parsePacket(l3ArpPacket);
+        ArpHeader.ArpPacket arpPacket = ArpHeader.parsePacket(l3ArpPacket);
 
-        if (arpPacket instanceof Arp.ArpRequest) {
-            Arp.ArpRequest arpRequest = (Arp.ArpRequest) arpPacket;
+        if (arpPacket instanceof ArpHeader.ArpRequest) {
+            ArpHeader.ArpRequest arpRequest = (ArpHeader.ArpRequest) arpPacket;
 
             mPacketDeque.add(CustomPacket.fromL2Packet(
-                    Arp.createResponseFrame(getLocalMacAddress(), arpRequest)
+                    ArpHeader.createResponseFrame(getLocalMacAddress(), arpRequest)
             ));
 
             addIpToMacPair(arpRequest.getRequesterIp(), arpRequest.getRequesterMac());
         }
 
-        if (arpPacket instanceof Arp.ArpReply) {
-            Arp.ArpReply arpReply = (Arp.ArpReply) arpPacket;
+        if (arpPacket instanceof ArpHeader.ArpReply) {
+            ArpHeader.ArpReply arpReply = (ArpHeader.ArpReply) arpPacket;
 
             addIpToMacPair(arpReply.getReplyerIp(), arpReply.getReplyerMac());
         }

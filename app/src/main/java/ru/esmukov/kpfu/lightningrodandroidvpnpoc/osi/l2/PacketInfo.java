@@ -1,17 +1,23 @@
-package ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter;
+package ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l2;
 
 import android.util.Log;
 
 import java.nio.ByteBuffer;
 
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.ByteBufferUtils;
+
 /**
  * Created by kostya on 06/01/2017.
  */
 
+// http://elixir.free-electrons.com/linux/latest/source/drivers/net/tun.c
+
 public class PacketInfo {
     private static final String TAG = "PacketInfo";
 
-    public static void prepend(ByteBuffer packet, int etherType) {
+    public static int PI_LEN = 4;
+
+    public static void writeAtPos(ByteBuffer packet, int pos, int etherType) {
         // todo looks like we don't need to ever set the TUN_PKT_STRIP flag, right?
         // see:
         // static ssize_t tun_put_user(struct tun_struct *tun,
@@ -22,19 +28,23 @@ public class PacketInfo {
         // http://lxr.free-electrons.com/source/include/uapi/linux/if_ether.h
         short flags = 0;
 
-        ByteBufferUtils.moveRight(packet, 4);
-
-        packet.putShort(0, flags);
+        packet.putShort(pos, flags);
 
         // Ethertype as per http://lxr.free-electrons.com/source/include/uapi/linux/if_ether.h
-        packet.putShort(2, (short) etherType);
+        packet.putShort(pos + 2, (short) etherType);
     }
 
-    public static PacketInfoHeader strip(ByteBuffer remotePacket) throws Exception {
-        int length = remotePacket.limit();
+    @Deprecated
+    public static void prepend(ByteBuffer packet, int etherType) {
+        ByteBufferUtils.moveRight(packet, PI_LEN);
+        writeAtPos(packet, 0, etherType);
+    }
+
+    public static PacketInfoHeader getAtPos(ByteBuffer remotePacket, int pos) {
+        int length = remotePacket.limit() - pos;
 
         if (length < 4) {
-            throw new Exception("packet with invalid length (<4)");
+            throw new RuntimeException("packet with invalid length (<4)");
         }
 
         /*
@@ -44,8 +54,8 @@ public class PacketInfo {
         };
          */
 
-        int flags = ((remotePacket.get(0) & 0xFF) << 8) | (remotePacket.get(1) & 0xFF);
-        int proto = ((remotePacket.get(2) & 0xFF) << 8) | (remotePacket.get(3) & 0xFF);
+        int flags = ((remotePacket.get(pos) & 0xFF) << 8) | (remotePacket.get(pos + 1) & 0xFF);
+        int proto = ((remotePacket.get(pos + 2) & 0xFF) << 8) | (remotePacket.get(pos + 3) & 0xFF);
 
         if (flags != 0) {
             Log.w(TAG, "received non-zero flags: " + flags);
@@ -56,9 +66,14 @@ public class PacketInfo {
         //                             void *msg_control, struct iov_iter *from,
         //                             int noblock)
 
-        ByteBufferUtils.moveLeft(remotePacket, 4);
-
         return new PacketInfoHeader(proto);
+    }
+
+    @Deprecated
+    public static PacketInfoHeader strip(ByteBuffer remotePacket) {
+        PacketInfoHeader pi = getAtPos(remotePacket, 0);
+        ByteBufferUtils.moveLeft(remotePacket, PI_LEN);
+        return pi;
     }
 
     public static class PacketInfoHeader {

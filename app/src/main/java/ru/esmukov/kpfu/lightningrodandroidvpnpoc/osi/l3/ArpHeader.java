@@ -1,14 +1,16 @@
-package ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.l2;
+package ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l3;
 
 import java.nio.ByteBuffer;
 
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.ByteBufferUtils;
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l2.EthernetHeader;
 
 /**
  * Created by kostya on 16/12/2016.
  */
 
-class Arp {
+public class ArpHeader implements L3Header {
+    // https://en.wikipedia.org/wiki/Address_Resolution_Protocol#Packet_structure
 
     private static final short HARDWARE_TYPE_ETHERNET = 1;
     private static final short OPCODE_REQUEST = 0x1;
@@ -22,7 +24,7 @@ class Arp {
      * @param targetIp
      * @return
      */
-    static ByteBuffer createRequestFrame(long localMac, int localIp, int targetIp) {
+    public static ByteBuffer createRequestFrame(long localMac, int localIp, int targetIp) {
         return createFrame(OPCODE_REQUEST,
                 localMac, localIp,
                 EthernetHeader.BROADCAST_MAC, targetIp);
@@ -35,7 +37,7 @@ class Arp {
      * @param arpRequest
      * @return
      */
-    static ByteBuffer createResponseFrame(long localMac, ArpRequest arpRequest) {
+    public static ByteBuffer createResponseFrame(long localMac, ArpRequest arpRequest) {
         return createFrame(OPCODE_REPLY,
                 localMac, arpRequest.getRequestedIp(),
                 arpRequest.getRequesterMac(), arpRequest.getRequesterIp());
@@ -48,7 +50,7 @@ class Arp {
      * @return
      * @throws Exception
      */
-    static ArpPacket parsePacket(ByteBuffer packet) throws Exception {
+    public static ArpPacket parsePacket(ByteBuffer packet) throws Exception {
         packet.position(0);
 
         short hardwareType = packet.getShort();
@@ -125,12 +127,12 @@ class Arp {
                                           long targetMac, int targetIp) {
         ByteBuffer packet = createPacket(opcode, senderMac, senderIp, targetMac, targetIp);
 
-        new EthernetHeader(senderMac, targetMac, EthernetHeader.TYPE_ARP).addToPacket(packet);
+        new EthernetHeader(targetMac, senderMac, EthernetHeader.TYPE_ARP).addToPacket(packet);
 
         return packet;
     }
 
-    static class ArpPacket {
+    public static class ArpPacket {
         protected long mSenderMac;
         protected int mSenderIp;
         protected long mTargetMac;
@@ -159,37 +161,52 @@ class Arp {
         }
     }
 
-    static class ArpReply extends ArpPacket {
+    public static class ArpReply extends ArpPacket {
         private ArpReply(long senderMac, int senderIp,
                          long targetMac, int targetIp) throws Exception {
             super(senderMac, senderIp, targetMac, targetIp);
         }
 
-        long getReplyerMac() {
+        public long getReplyerMac() {
             return mSenderMac;
         }
 
-        int getReplyerIp() {
+        public int getReplyerIp() {
             return mSenderIp;
         }
     }
 
-    static class ArpRequest extends ArpPacket {
+    public static class ArpRequest extends ArpPacket {
         private ArpRequest(long senderMac, int senderIp,
                            long targetMac, int targetIp) throws Exception {
             super(senderMac, senderIp, targetMac, targetIp);
         }
 
-        long getRequesterMac() {
+        public long getRequesterMac() {
             return mSenderMac;
         }
 
-        int getRequesterIp() {
+        public int getRequesterIp() {
             return mSenderIp;
         }
 
-        int getRequestedIp() {
+        public int getRequestedIp() {
             return mTargetIp;
         }
+    }
+
+    @Override
+    public int getMinimumHeaderLength() {
+        return 28;
+    }
+
+    @Override
+    public int getTotalLength(ByteBuffer packet) {
+        return 28;
+    }
+
+    @Override
+    public boolean isMatch(ByteBuffer packet) {
+        return packet.limit() >= 2 && packet.getShort() == HARDWARE_TYPE_ETHERNET;
     }
 }

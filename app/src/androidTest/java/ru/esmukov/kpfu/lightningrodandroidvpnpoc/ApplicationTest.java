@@ -1,4 +1,4 @@
-package ru.esmukov.kpfu.lightningrodandroidvpnpoc;
+package ru.esmukov.kpfu.lightningrodandroidvpnpoc2;
 
 import android.app.Application;
 import android.test.ApplicationTestCase;

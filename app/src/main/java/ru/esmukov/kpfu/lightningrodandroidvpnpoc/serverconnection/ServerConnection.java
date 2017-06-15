@@ -17,7 +17,7 @@ public interface ServerConnection {
 
     void configureBlocking(boolean blockingMode) throws IOException;
 
-    void write(ByteBuffer source) throws IOException;
+    int write(ByteBuffer source) throws IOException;
 
     int read(ByteBuffer target) throws IOException;
 

@@ -165,7 +165,7 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
             // Packets received need to be written to this output stream.
             FileOutputStream out = new FileOutputStream(mInterface.getFileDescriptor());
             // Allocate the buffer for a single packet.
-            ByteBuffer packet = ByteBuffer.allocate(32767);
+//            ByteBuffer packet = ByteBuffer.allocate(32767);
 
             PacketFilter packetFilter = mSocatServerConnectionInfo.createNewPacketFilter();
 
@@ -178,43 +178,11 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
                 // Assume that we did not make any progress in this iteration.
                 boolean idle = true;
 
-                // Tun -> User
-                // Read the outgoing packet from the input stream.
-                packet.clear();
-                int length = in.read(packet.array());
+                if (packetFilter.consumeLocal(in)) idle = false;
+                if (packetFilter.produceRemote(tunnel)) idle = false;
+                if (packetFilter.consumeRemote(tunnel)) idle = false;
+                if (packetFilter.produceLocal(out)) idle = false;
 
-                if (length > 0) {
-                    packet.limit(length);
-
-                    if (packetFilter.fromLocalToRemote(packet)) {
-                        tunnel.write(packet);
-                    }
-
-                    // packet.clear();
-                    // There might be more outgoing packets.
-                    idle = false;
-                }
-
-                while (packetFilter.nextCustomPacketToRemote(packet)) {
-                    tunnel.write(packet);
-                    idle = false;
-                }
-
-                // User -> Tun
-                // Read the incoming packet from the tunnel.
-                packet.clear();
-                length = tunnel.read(packet);
-                if (length > 0) {
-                    packet.limit(length);
-
-                    if (packetFilter.fromRemoteToLocal(packet)) {
-                        out.write(packet.array(), 0, packet.limit());
-                    }
-
-                    // packet.clear();
-                    // There might be more incoming packets.
-                    idle = false;
-                }
                 // If we are idle or waiting for the network, sleep for a
                 // fraction of time to avoid busy looping.
                 if (idle) {
@@ -228,7 +196,7 @@ public class SocatVpnService extends VpnService implements Handler.Callback, Run
         } catch (IllegalStateException | InterruptedException e) {
             throw e;
         } catch (Exception e) {
-            Log.e(TAG, "Got " + e.toString());
+            Log.e(TAG, "Got " + e.toString(), e);
         } finally {
             try {
                 if (tunnel != null)
