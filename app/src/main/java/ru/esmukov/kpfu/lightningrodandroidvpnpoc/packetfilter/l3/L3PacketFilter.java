@@ -87,8 +87,14 @@ public class L3PacketFilter extends BasePacketFilter implements PacketFilter {
         while (true) {
             packetInfoBuffer.position(0);
             packetInfoBuffer.limit(packetInfoBuffer.capacity());
-            if (!readHeader(tunnel, packetInfoBuffer))
-                break;
+            if (l3Header == null) {
+                // don't block if nothing has read yet
+                if (!readHeader(tunnel, packetInfoBuffer))
+                    return null;
+            } else {
+                // wait for the rest of the packet we've already started to read
+                while (!readHeader(tunnel, packetInfoBuffer));
+            }
 
             if (l3Header != null) {
                 // we need to determine what have we just read: another PI or a real packet
@@ -100,8 +106,6 @@ public class L3PacketFilter extends BasePacketFilter implements PacketFilter {
             int etherType = PacketInfo.getAtPos(packetInfoBuffer, 0).getProto();
             l3Header = getL3HeaderByEtherType(etherType);
         }
-        if (l3Header == null)
-            return null;
 
         packetInfoBuffer.position(0);
         inPacketHeaderBuffer.position(0);

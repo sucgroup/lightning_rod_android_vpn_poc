@@ -148,8 +148,14 @@ public class L2ToL3PacketFilter extends BasePacketFilter implements PacketFilter
         inPacketHeaderBuffer.limit(EthernetHeader.ETHERNET_HEADER_LENGTH);
         while (true) {
             // fill buf
-            if (!readHeader(tunnel, inPacketHeaderBuffer))
-                break;
+            if (etherType == -1) {
+                // don't block if nothing has read yet
+                if (!readHeader(tunnel, inPacketHeaderBuffer))
+                    return null;
+            } else {
+                // wait for the rest of the packet we've already started to read
+                while (!readHeader(tunnel, inPacketHeaderBuffer));
+            }
 
             if (etherType != -1) {
                 // we need to determine what have we just read: another PI or a real packet
@@ -166,7 +172,6 @@ public class L2ToL3PacketFilter extends BasePacketFilter implements PacketFilter
             inPacketHeaderBuffer.position(oldLen - PacketInfo.PI_LEN);
             inPacketHeaderBuffer.limit(oldLen);
         }
-        return null;
     }
 
     private EthernetHeader readL2Header(ServerConnection tunnel) throws IOException {
