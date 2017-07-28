@@ -9,15 +9,28 @@ import java.net.UnknownHostException;
 
 public class AddressMask {
     private String mAddress;  // todo maybe switch to InetAddress
+    private int mAddressInt;
     private int mPrefixLength;
 
     public AddressMask(String address, int prefixLength) {
         this.mAddress = address;
+        try {
+            this.mAddressInt = pack(InetAddress.getByName(address).getAddress());
+        }
+        catch (UnknownHostException e) {
+            // Only IPv4 addresses are expected here. If host resolution has failed,
+            // then this was a hostname, which is unexpected anyway. So lets fail.
+            throw new RuntimeException(e);
+        }
         this.mPrefixLength = prefixLength;
     }
 
     public String getAddress() {
         return mAddress;
+    }
+
+    public int getAddressInt() {
+        return mAddressInt;
     }
 
     public int getPrefixLength() {

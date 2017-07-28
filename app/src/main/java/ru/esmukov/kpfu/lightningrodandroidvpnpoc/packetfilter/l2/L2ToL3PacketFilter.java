@@ -5,13 +5,13 @@ import android.util.Log;
 import java.io.FileInputStream;
 import java.io.IOException;
 
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.SocatServerConnectionInfo;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l2.EthernetHeader;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l3.ArpHeader;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l3.Ip4Header;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l3.Ip6Header;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l3.L3Header;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.BasePacketFilter;
-import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.BufLogger;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.ByteBufferUtils;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.PacketFilter;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l2.PacketInfo;
@@ -24,11 +24,12 @@ import ru.esmukov.kpfu.lightningrodandroidvpnpoc.serverconnection.ServerConnecti
 public class L2ToL3PacketFilter extends BasePacketFilter implements PacketFilter {
     private static final String TAG = "L2ToL3PacketFilter";
 
-    private MacResolver mMacResolver = new MacResolver(
-            LocalMacAddressGenerator.generateRandomLocallyAdministeredMacAddress());
+    private final MacResolver mMacResolver;
 
-    public L2ToL3PacketFilter(boolean packetInfo) {
+    public L2ToL3PacketFilter(boolean packetInfo,
+                              SocatServerConnectionInfo.InterfaceInfo interfaceInfo) {
         super(packetInfo);
+        mMacResolver = new MacResolver(interfaceInfo);
     }
 
     @Override

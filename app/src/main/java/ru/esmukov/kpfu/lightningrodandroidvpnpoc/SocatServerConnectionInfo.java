@@ -4,6 +4,7 @@ import android.net.VpnService;
 
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.PacketFilter;
@@ -15,6 +16,9 @@ import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.l2.L2ToL3PacketFil
  */
 
 public class SocatServerConnectionInfo {
+
+    private static final long mLocalMacAddress = LocalMacAddressGenerator.generateRandomLocallyAdministeredMacAddress();
+
     // c,IP,PORT,PROTOCOL
     // l,PORT,tcp
     private RemoteConnectionInfo mRemoteConnectionInfo = null;
@@ -141,10 +145,14 @@ public class SocatServerConnectionInfo {
 
     public PacketFilter createNewPacketFilter() {
         if (mIsTap) {
-            return new L2ToL3PacketFilter(mPacketInfo);
+            return new L2ToL3PacketFilter(mPacketInfo, getInterfaceInfo());
         } else {
             return new L3PacketFilter(mPacketInfo);
         }
+    }
+
+    public InterfaceInfo getInterfaceInfo() {
+        return new InterfaceInfo(mLocalInterfaceAddressList);
     }
 
     public interface RemoteConnectionInfo {
@@ -215,4 +223,19 @@ public class SocatServerConnectionInfo {
         }
     }
 
+    public static class InterfaceInfo {
+        private List<AddressMask> mLocalInterfaceAddressList;
+
+        private InterfaceInfo(List<AddressMask> localInterfaceAddressList) {
+            mLocalInterfaceAddressList = Collections.unmodifiableList(localInterfaceAddressList);
+        }
+
+        public List<AddressMask> getLocalInterfaceAddressList() {
+            return mLocalInterfaceAddressList;
+        }
+
+        public long getLocalMacAddress() {
+            return SocatServerConnectionInfo.mLocalMacAddress;
+        }
+    }
 }

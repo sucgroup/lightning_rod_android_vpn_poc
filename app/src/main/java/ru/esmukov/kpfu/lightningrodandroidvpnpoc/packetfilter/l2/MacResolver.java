@@ -6,6 +6,8 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
 
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.AddressMask;
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.SocatServerConnectionInfo;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l2.EthernetHeader;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l3.ArpHeader;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l3.Ip4Header;
@@ -22,18 +24,18 @@ import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l3.Ip4Header;
  */
 class MacResolver {
 
-    private long mLocalMacAddress;
+    private SocatServerConnectionInfo.InterfaceInfo mInterfaceInfo;
 
     private Map<Integer, Long> mIpToMac = new HashMap<>(); // ARP table
     private Deque<CustomPacket> mPacketDeque = new LinkedList<>(); // packets ready to be sent
     private Map<Integer, Deque<CustomPacket>> mIpToPacketsWaitingForMacResolution = new HashMap<>();
 
-    MacResolver(long localMacAddress) {
-        mLocalMacAddress = localMacAddress;
+    MacResolver(SocatServerConnectionInfo.InterfaceInfo interfaceInfo) {
+        mInterfaceInfo = interfaceInfo;
     }
 
     long getLocalMacAddress() {
-        return mLocalMacAddress;
+        return mInterfaceInfo.getLocalMacAddress();
     }
 
     Long getDestinationMacAddressByL3IpPacket(ByteBuffer ip4Packet) {
@@ -67,9 +69,15 @@ class MacResolver {
         if (arpPacket instanceof ArpHeader.ArpRequest) {
             ArpHeader.ArpRequest arpRequest = (ArpHeader.ArpRequest) arpPacket;
 
-            mPacketDeque.add(CustomPacket.fromL2Packet(
-                    ArpHeader.createResponseFrame(getLocalMacAddress(), arpRequest)
-            ));
+            for (AddressMask addressMask : mInterfaceInfo.getLocalInterfaceAddressList()) {
+                if (addressMask.getAddressInt() == arpRequest.getRequestedIp()) {
+                    // this is a request for us - send a reply
+                    mPacketDeque.add(CustomPacket.fromL2Packet(
+                            ArpHeader.createResponseFrame(getLocalMacAddress(), arpRequest)
+                    ));
+                    break;
+                }
+            }
 
             addIpToMacPair(arpRequest.getRequesterIp(), arpRequest.getRequesterMac());
         }
