@@ -27,8 +27,9 @@ public class L2ToL3PacketFilter extends BasePacketFilter implements PacketFilter
     private final MacResolver mMacResolver;
 
     public L2ToL3PacketFilter(boolean packetInfo,
+                              boolean slip,
                               SocatServerConnectionInfo.InterfaceInfo interfaceInfo) {
-        super(packetInfo);
+        super(packetInfo, slip);
         mMacResolver = new MacResolver(interfaceInfo);
     }
 
@@ -54,7 +55,7 @@ public class L2ToL3PacketFilter extends BasePacketFilter implements PacketFilter
         inIp4Buffer.limit(totalLen);
         inIp4Buffer.put(inPacketHeaderBuffer);
         while (inIp4Buffer.position() < inIp4Buffer.limit()) {
-            tunnel.read(inIp4Buffer);
+            read(tunnel, inIp4Buffer);
         }
 
         if (l3Header instanceof Ip4Header) {
@@ -110,21 +111,18 @@ public class L2ToL3PacketFilter extends BasePacketFilter implements PacketFilter
             return false;
 
         if (mPacketInfo) {
-            writePi(tunnel, EthernetHeader.getEtherType(outTunBuffer));
+            putPiToOutbuffer(EthernetHeader.getEtherType(outTunBuffer));
         }
-
+        outTunBuffer.position(0);
 //        BufLogger.logOutgoing(outTunBuffer);
-        write(tunnel, outTunBuffer);
+        writeFrame(tunnel, outTunBuffer);
         outTunBuffer.limit(0);
         return true;
     }
 
-    private void writePi(ServerConnection tunnel, int etherType) throws IOException {
-        packetInfoBuffer.position(0);
-        packetInfoBuffer.limit(packetInfoBuffer.capacity());
-        PacketInfo.writeAtPos(packetInfoBuffer, 0, etherType);
-//        BufLogger.logOutgoing(packetInfoBuffer);
-        write(tunnel, packetInfoBuffer);
+    private void putPiToOutbuffer(int etherType) throws IOException {
+        ByteBufferUtils.moveRight(outTunBuffer, PacketInfo.PI_LEN);
+        PacketInfo.writeAtPos(outTunBuffer, 0, etherType);
     }
 
     private void convertL3ToL2() {

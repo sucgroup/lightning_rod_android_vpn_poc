@@ -69,13 +69,6 @@ public class PacketInfo {
         return new PacketInfoHeader(proto);
     }
 
-    @Deprecated
-    public static PacketInfoHeader strip(ByteBuffer remotePacket) {
-        PacketInfoHeader pi = getAtPos(remotePacket, 0);
-        ByteBufferUtils.moveLeft(remotePacket, PI_LEN);
-        return pi;
-    }
-
     public static class PacketInfoHeader {
         private int mProto;
 

@@ -41,6 +41,9 @@ public class SocatServerConnectionInfo {
     // o,pi
     private boolean mPacketInfo = false;
 
+    // o,slip
+    private boolean mSlip = false;
+
     // Tap -- L2 tunnel.
     // Tun (default) -- L3 tunnel -- the same level as the VpnService.
     // o,tap || o,tun
@@ -97,6 +100,11 @@ public class SocatServerConnectionInfo {
                         if ("no_pi".equalsIgnoreCase(fields[1]))
                             mPacketInfo = false;
 
+                        if ("slip".equalsIgnoreCase(fields[1]))
+                            mSlip = true;
+                        if ("no_slip".equalsIgnoreCase(fields[1]))
+                            mSlip = false;
+
                         if ("tap".equalsIgnoreCase(fields[1]))
                             mIsTap = true;
                         if ("tun".equalsIgnoreCase(fields[1]))
@@ -145,9 +153,9 @@ public class SocatServerConnectionInfo {
 
     public PacketFilter createNewPacketFilter() {
         if (mIsTap) {
-            return new L2ToL3PacketFilter(mPacketInfo, getInterfaceInfo());
+            return new L2ToL3PacketFilter(mPacketInfo, mSlip, getInterfaceInfo());
         } else {
-            return new L3PacketFilter(mPacketInfo);
+            return new L3PacketFilter(mPacketInfo, mSlip);
         }
     }
 

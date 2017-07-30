@@ -10,6 +10,7 @@ import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l3.L3Header;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l3.L3HeaderFacade;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l3.UnknownL3PacketException;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.BasePacketFilter;
+import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.ByteBufferUtils;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.packetfilter.PacketFilter;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.osi.l2.PacketInfo;
 import ru.esmukov.kpfu.lightningrodandroidvpnpoc.serverconnection.ServerConnection;
@@ -21,8 +22,8 @@ import ru.esmukov.kpfu.lightningrodandroidvpnpoc.serverconnection.ServerConnecti
 public class L3PacketFilter extends BasePacketFilter implements PacketFilter {
     private static final String TAG = "L3PacketFilter";
 
-    public L3PacketFilter(boolean packetInfo) {
-        super(packetInfo);
+    public L3PacketFilter(boolean packetInfo, boolean slip) {
+        super(packetInfo, slip);
     }
 
     @Override
@@ -49,7 +50,7 @@ public class L3PacketFilter extends BasePacketFilter implements PacketFilter {
         inIp4Buffer.limit(totalLen);
         inIp4Buffer.put(inPacketHeaderBuffer);
         while (inIp4Buffer.position() < inIp4Buffer.limit()) {
-            tunnel.read(inIp4Buffer);
+            read(tunnel, inIp4Buffer);
         }
         if (!(l3Header instanceof Ip4Header)) {
             // eat up that junk packet, which VpnService will not understand
@@ -67,19 +68,17 @@ public class L3PacketFilter extends BasePacketFilter implements PacketFilter {
             return false;
 
         if (mPacketInfo) {
-            writePi(tunnel);
+            putPiToOutbuffer();
         }
-
-        write(tunnel, outTunBuffer);
+        outTunBuffer.position(0);
+        writeFrame(tunnel, outTunBuffer);
         outTunBuffer.limit(0);
         return true;
     }
 
-    private void writePi(ServerConnection tunnel) throws IOException {
-        packetInfoBuffer.position(0);
-        packetInfoBuffer.limit(packetInfoBuffer.capacity());
-        PacketInfo.writeAtPos(packetInfoBuffer, 0, EthernetHeader.TYPE_IP);
-        write(tunnel, packetInfoBuffer);
+    private void putPiToOutbuffer() throws IOException {
+        ByteBufferUtils.moveRight(outTunBuffer, PacketInfo.PI_LEN);
+        PacketInfo.writeAtPos(outTunBuffer, 0, EthernetHeader.TYPE_IP);
     }
 
     private L3Header readL3HeaderWithPi(ServerConnection tunnel) throws IOException, UnknownL3PacketException {

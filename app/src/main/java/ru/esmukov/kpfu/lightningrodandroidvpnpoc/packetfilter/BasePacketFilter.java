@@ -18,6 +18,7 @@ import ru.esmukov.kpfu.lightningrodandroidvpnpoc.serverconnection.ServerConnecti
 
 public abstract class BasePacketFilter implements PacketFilter {
     protected boolean mPacketInfo;
+    protected boolean mSlip;
 
     protected final ByteBuffer packetInfoBuffer = ByteBuffer.allocate(PacketInfo.PI_LEN);
     protected final ByteBuffer inPacketHeaderBuffer = ByteBuffer.allocate(Math.max(L3HeaderFacade.MAX_L3_HEADER_LEN, EthernetHeader.ETHERNET_HEADER_LENGTH));
@@ -29,8 +30,9 @@ public abstract class BasePacketFilter implements PacketFilter {
         outTunBuffer.limit(0);
     }
 
-    public BasePacketFilter(boolean packetInfo) {
-        this.mPacketInfo = packetInfo;
+    public BasePacketFilter(boolean packetInfo, boolean slip) {
+        mPacketInfo = packetInfo;
+        mSlip = slip;
     }
 
     @Override
@@ -68,11 +70,43 @@ public abstract class BasePacketFilter implements PacketFilter {
         return true;
     }
 
-    protected void write(ServerConnection tunnel, ByteBuffer buffer) throws IOException {
+    protected void writeFrame(ServerConnection tunnel, ByteBuffer buffer) throws IOException {
+        if (mSlip) {
+            Slip.slipEncodeFrame(buffer);
+        }
         int toWrite = buffer.limit();
         buffer.position(0);
         while (toWrite > 0) {
             toWrite -= tunnel.write(buffer);
+        }
+    }
+
+    protected void read(ServerConnection tunnel, ByteBuffer buffer) throws IOException {
+        int prevPos = buffer.position();
+        boolean bufIncreased = false;
+        while (true) {
+            if (mSlip && buffer.position() == buffer.limit()) {
+                // if buffer is full, then we have already read something. but we're still here,
+                // that means that buffer ends with Slip.ESC. So increase buffer for 1 byte,
+                // to read what follows the Slip.ESC and perform SLIP transformation below.
+                bufIncreased = true;
+                buffer.limit(buffer.limit() + 1);
+            }
+            tunnel.read(buffer);
+            if (mSlip) {
+                try {
+                    if (!Slip.slipStrip(buffer, prevPos)) {
+                        // It means that we have Slip.ESC at the end. In this case we have
+                        // to read at least 1 more byte, to perform a SLIP transformation.
+                        continue;
+                    }
+                } finally {
+                    if (bufIncreased) {
+                        buffer.limit(buffer.limit() - 1);
+                    }
+                }
+            }
+            break;
         }
     }
 
@@ -84,7 +118,7 @@ public abstract class BasePacketFilter implements PacketFilter {
 
     protected boolean readHeader(ServerConnection tunnel, ByteBuffer target) throws IOException {
         do {
-            tunnel.read(target);
+            read(tunnel, target);
         } while (target.position() > 0 && target.position() < target.limit());
         if (target.position() <= 0) {
             return false;
