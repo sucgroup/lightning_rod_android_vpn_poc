@@ -8,12 +8,14 @@ import java.nio.ByteBuffer;
 
 public class ByteBufferUtils {
 
+    // ByteBuffer.get/ByteBuffer.put are VERY slow. copying to a byte array,
+    // modifying it and putting it back is a lot faster.
+    private final static byte[] mLocalBuf = new byte[2<<17];
+
     public static void moveLeft(ByteBuffer buffer, int shiftBytes) {
         int length = buffer.limit();
 
-        for (int i = shiftBytes; i < length; i++) {
-            buffer.put(i - shiftBytes, buffer.get(i));
-        }
+        buffer.put(buffer.array(), shiftBytes, length - shiftBytes);
         buffer.position(0);
         buffer.limit(length - shiftBytes);
     }
@@ -22,8 +24,11 @@ public class ByteBufferUtils {
         int length = buffer.limit();
 
         buffer.limit(length + shiftBytes);
-        for (int i = length - 1; i >= 0; i--) {
-            buffer.put(i + shiftBytes, buffer.get(i));
+        buffer.position(0);
+        synchronized (mLocalBuf) {
+            buffer.get(mLocalBuf, 0, length);
+            buffer.position(shiftBytes);
+            buffer.put(mLocalBuf, 0, length);
         }
         buffer.position(0);
     }
